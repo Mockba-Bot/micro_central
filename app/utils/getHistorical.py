@@ -128,5 +128,22 @@ def get_all_binance(symbol, kline_size, token, save=False):
     # print('All caught up..!')
     return data_df
 
+# Fetch historical data from the database
+def get_historical_data(pair, timeframe, values):
+    field = '"timestamp"'
+    table = pair + "_" + timeframe
+    f = "'" + values.split('|')[0] + "'"
+    t = "'" + values.split('|')[1] + "'"
+    query = f"SELECT DISTINCT {field}, low, high, volume, close FROM public.\"{table}\" WHERE timestamp >= {f} AND timestamp <= {t} ORDER BY 1"
+    df = pd.read_sql(query, con=db_con)
+    
+    # Convert columns to numeric types
+    df['close'] = pd.to_numeric(df['close'])
+    df['high'] = pd.to_numeric(df['high'])
+    df['low'] = pd.to_numeric(df['low'])
+    df['volume'] = pd.to_numeric(df['volume'])
+    
+    return df
+    
 # Example usage
 # get_all_binance("NEARUSDT", "5m", "556159355", save=True)
