@@ -10,6 +10,11 @@ class BinanceRequest(BaseModel):
     token: str
     save: bool = False
 
+class HistoricalDataRequest(BaseModel):
+    pair: str  # Trading pair, e.g., "BTCUSDT"
+    timeframe: str  # Time interval, e.g., "1h"
+    values: str  # Date range, e.g., "start_date|end_date"    
+
 @router.post("/historical-data")
 def fetch_historical_data(request: BinanceRequest):
     """
