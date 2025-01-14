@@ -135,7 +135,7 @@ def get_historical_data(pair, timeframe, values):
     f = "'" + values.split('|')[0] + "'"
     t = "'" + values.split('|')[1] + "'"
     query = f"SELECT DISTINCT {field}, low, high, volume, close FROM public.\"{table}\" WHERE timestamp >= {f} AND timestamp <= {t} ORDER BY 1"
-    df = pd.read_sql(query, con=db_con)
+    df = pd.read_sql(query, con=operations.db_con)
     
     # Convert columns to numeric types
     df['close'] = pd.to_numeric(df['close'])
