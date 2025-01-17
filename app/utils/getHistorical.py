@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 # Add the project root to sys.path
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from utils import operations, security
+from sqlalchemy.sql import text
 
 # Load environment variables from the specified .env file
 load_dotenv(dotenv_path=".env.micro.central")
@@ -87,33 +88,40 @@ def get_all_binance(symbol, kline_size, token, save=False):
 
     table_exists = pd.read_sql(check_table_exists, operations.db_con).iloc[0, 0] > 0
     if table_exists:
-        # Get existing data and find the latest timestamp
-        data_df = pd.read_sql(f'SELECT * FROM public."{tablename}"', operations.db_con, index_col='timestamp', parse_dates=['timestamp'])
-        latest_timestamp = data_df.index.max()
+        # Delete the last 15 rows to avoid duplicates
+        delete_query = text(f"""
+        DELETE FROM public."{tablename}"
+        WHERE "timestamp" IN (
+            SELECT "timestamp" 
+            FROM public."{tablename}" 
+            ORDER BY "timestamp" DESC 
+            LIMIT 10
+        );
+        """)
+        with operations.db_con.connect() as connection:
+            connection.execute(delete_query)
+
+        # Get the latest timestamp after deletion
+        query = f'SELECT MAX("timestamp") as max_timestamp FROM public."{tablename}"'
+        latest_timestamp = pd.read_sql(query, operations.db_con).iloc[0, 0]
     else:
-        data_df = pd.DataFrame()
         latest_timestamp = None
 
     # Determine the time range to fetch new data
     if latest_timestamp is not None:
-        oldest_point = latest_timestamp + pd.Timedelta(minutes=1)  # Fetch from the next minute
+        oldest_point = pd.to_datetime(latest_timestamp) + pd.Timedelta(minutes=1)  # Fetch from the next minute
     else:
         oldest_point = datetime.strptime("1 Jan 2017", "%d %b %Y")  # Default start date
 
     newest_point = datetime.utcnow()  # Current time
-    delta_min = (newest_point - oldest_point).total_seconds() / 60
-    available_data = math.ceil(delta_min / binsizes[kline_size])
-
-    if oldest_point == datetime.strptime("1 Jan 2017", "%d %b %Y"):
-        message = f'Downloading all available {kline_size} data for {symbol}. Be patient..!'
-    else:
-        message = (f'Downloading {delta_min} minutes of new data available for {symbol}, i.e. '
-                   f'{available_data} instances of {kline_size} data.')
 
     # Fetch historical data from Binance
-    klines = binance_client.get_historical_klines(symbol, kline_size, 
-                                                  oldest_point.strftime("%d %b %Y %H:%M:%S"), 
-                                                  newest_point.strftime("%d %b %Y %H:%M:%S"))
+    klines = binance_client.get_historical_klines(
+        symbol, kline_size,
+        oldest_point.strftime("%d %b %Y %H:%M:%S"),
+        newest_point.strftime("%d %b %Y %H:%M:%S")
+    )
+
     data = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close',
                                          'volume', 'close_time', 'quote_av', 'trades', 
                                          'tb_base_av', 'tb_quote_av', 'ignore'])
@@ -122,20 +130,21 @@ def get_all_binance(symbol, kline_size, token, save=False):
     # Remove rows with NaN values in the 'timestamp' column
     data.dropna(subset=['timestamp'], inplace=True)
 
-    if len(data_df) > 0:
-        temp_df = pd.DataFrame(data)
-        data_df = pd.concat([data_df, temp_df]).drop_duplicates(subset=['timestamp'])
-    else:
-        data_df = data.drop_duplicates(subset=['timestamp'])
+    # Deduplicate the new data
+    data = data.drop_duplicates(subset=['timestamp'])
 
-    data_df.set_index('timestamp', inplace=True)
-    
     if save:
-        # Reset index to include it as a column before saving to SQL
-        data_df.reset_index().to_sql(tablename, operations.db_con, if_exists='append', index=False)
+        # Deduplicate before saving
+        query_existing = f'SELECT timestamp FROM public."{tablename}"'
+        existing_timestamps = pd.read_sql(query_existing, operations.db_con)['timestamp']
+        data = data[~data['timestamp'].isin(existing_timestamps)]
+
+        # Save new, non-duplicated data to the database
+        data.to_sql(tablename, operations.db_con, if_exists='append', index=False)
         
     operations.remove_null_from_sql_table(tablename)
-    return data_df
+    return data
+
 
 
 # Fetch historical data from the database
