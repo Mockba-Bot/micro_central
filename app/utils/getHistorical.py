@@ -87,23 +87,30 @@ def get_all_binance(symbol, kline_size, token, save=False):
 
     table_exists = pd.read_sql(check_table_exists, operations.db_con).iloc[0, 0] > 0
     if table_exists:
+        # Get existing data and find the latest timestamp
         data_df = pd.read_sql(f'SELECT * FROM public."{tablename}"', operations.db_con, index_col='timestamp', parse_dates=['timestamp'])
+        latest_timestamp = data_df.index.max()
     else:
         data_df = pd.DataFrame()
+        latest_timestamp = None
 
-    oldest_point, newest_point = minutes_of_new_data(
-        symbol, kline_size, data_df, source="binance", binance_client=binance_client)
+    # Determine the time range to fetch new data
+    if latest_timestamp is not None:
+        oldest_point = latest_timestamp + pd.Timedelta(minutes=1)  # Fetch from the next minute
+    else:
+        oldest_point = datetime.strptime("1 Jan 2017", "%d %b %Y")  # Default start date
+
+    newest_point = datetime.utcnow()  # Current time
     delta_min = (newest_point - oldest_point).total_seconds() / 60
     available_data = math.ceil(delta_min / binsizes[kline_size])
 
-    if oldest_point == datetime.strptime(date, '%d %b %Y'):
+    if oldest_point == datetime.strptime("1 Jan 2017", "%d %b %Y"):
         message = f'Downloading all available {kline_size} data for {symbol}. Be patient..!'
     else:
         message = (f'Downloading {delta_min} minutes of new data available for {symbol}, i.e. '
                    f'{available_data} instances of {kline_size} data.')
 
-    # print(message)
-
+    # Fetch historical data from Binance
     klines = binance_client.get_historical_klines(symbol, kline_size, 
                                                   oldest_point.strftime("%d %b %Y %H:%M:%S"), 
                                                   newest_point.strftime("%d %b %Y %H:%M:%S"))
@@ -117,16 +124,19 @@ def get_all_binance(symbol, kline_size, token, save=False):
 
     if len(data_df) > 0:
         temp_df = pd.DataFrame(data)
-        data_df = pd.concat([data_df,temp_df]).drop_duplicates(subset=['timestamp'])
+        data_df = pd.concat([data_df, temp_df]).drop_duplicates(subset=['timestamp'])
     else:
         data_df = data.drop_duplicates(subset=['timestamp'])
+
     data_df.set_index('timestamp', inplace=True)
+    
     if save:
-        data_df.to_sql(tablename, operations.db_con, if_exists='append')
+        # Reset index to include it as a column before saving to SQL
+        data_df.reset_index().to_sql(tablename, operations.db_con, if_exists='append', index=False)
         
     operations.remove_null_from_sql_table(tablename)
-    # print('All caught up..!')
     return data_df
+
 
 # Fetch historical data from the database
 def get_historical_data(pair, timeframe, values):
