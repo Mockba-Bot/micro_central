@@ -146,7 +146,6 @@ def get_all_binance(symbol, kline_size, token, save=False):
     return data
 
 
-
 # Fetch historical data from the database
 def get_historical_data(pair, timeframe, values):
     field = '"timestamp"'

@@ -4,7 +4,7 @@ celery_app = Celery(
     'micro_central',
     broker='redis://redis:6379/0',
     backend='redis://redis:6379/0',
-    include=['app.tasks.notification_tasks']
+    include=['app.tasks.notification_tasks', 'app.tasks.get_all_binance_tasks', 'app.tasks.get_all_binance_tasks']
 )
 
 celery_app.conf.update(

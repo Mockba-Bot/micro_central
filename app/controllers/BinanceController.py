@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.utils.getHistorical import get_all_binance, get_historical_data
+from app.tasks.binance_tasks import get_all_binance_task, get_historical_data_task
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ def fetch_historical_data(request: BinanceRequest):
         - Success message or error message.
     """
     try:
-        data_df = get_all_binance(
+        data_df = get_all_binance_task(
             symbol=request.symbol,
             kline_size=request.kline_size,
             token=request.token,
@@ -58,7 +58,7 @@ def query_historical_data(request: HistoricalDataRequest):
         - DataFrame as a JSON object.
     """
     try:
-        data_df = get_historical_data(
+        data_df = get_historical_data_task(
             pair=request.pair,
             timeframe=request.timeframe,
             values=request.values,
