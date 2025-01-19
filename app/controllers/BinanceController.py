@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.tasks.binance_tasks import get_all_binance_task, get_historical_data_task
+from app.tasks.celery_tasks import get_historical_data_task
+from app.utils.getHistorical import get_all_binance
 
 router = APIRouter()
 
@@ -30,7 +31,7 @@ def fetch_historical_data(request: BinanceRequest):
         - Success message or error message.
     """
     try:
-        data_df = get_all_binance_task(
+        data_df = get_all_binance(
             symbol=request.symbol,
             kline_size=request.kline_size,
             token=request.token,
@@ -39,7 +40,7 @@ def fetch_historical_data(request: BinanceRequest):
         if data_df is not None:
             return {"message": "Data fetched successfully"}
         else:
-            return {"message": "No data found."}
+            return {"message": "Data updated."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
@@ -58,13 +59,14 @@ def query_historical_data(request: HistoricalDataRequest):
         - DataFrame as a JSON object.
     """
     try:
-        data_df = get_historical_data_task(
+        task = get_historical_data_task.delay(
             pair=request.pair,
             timeframe=request.timeframe,
             values=request.values,
         )
-        if not data_df.empty:
-            return data_df.to_dict(orient="records")
+        result = task.get(timeout=5)  # Wait for the task to complete and get the result
+        if result:
+            return result
         else:
             return {"message": "No data found for the given query."}
     except Exception as e:

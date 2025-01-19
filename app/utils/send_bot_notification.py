@@ -1,7 +1,6 @@
 import os
 import asyncio
 import telebot
-from app.tasks.celery_app import celery_app
 from dotenv import load_dotenv
 
 # Load environment variables from the specified .env file
@@ -11,7 +10,6 @@ load_dotenv(dotenv_path=".env.micro.central")
 API_TOKEN = os.getenv("API_TOKEN")
 bot = telebot.TeleBot(API_TOKEN)
 
-@celery_app.task
 def send_telegram_message(chat_id: int, message: str):
     """
     Celery task to send a Telegram message asynchronously with rate-limiting.

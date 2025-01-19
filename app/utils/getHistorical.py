@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 # # Import custom operations module for database connection
 # Add the project root to sys.path
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from utils import operations, security
+from app.utils import operations, security
 from sqlalchemy.sql import text
 
 # Load environment variables from the specified .env file
@@ -32,7 +32,7 @@ def get_user_data(api_telegram: int) -> pd.DataFrame:
     # Check if data is in Redis cache
     cached_data = redis_client.get(f"user_data:{api_telegram}")
     if cached_data:
-        print("Using cached data")
+        # print("Using cached data")
         return pickle.loads(cached_data)
 
     # If not in cache, call the operations.getUser function
@@ -75,7 +75,6 @@ def minutes_of_new_data(symbol, kline_size, data, source, binance_client):
         new = pd.to_datetime(binance_client.get_klines(
             symbol=symbol, interval=kline_size)[-1][0], unit='ms')
     return old, new
-
 
 def get_all_binance(symbol, kline_size, token, save=False):
     binance_client = get_binance_client(token)
@@ -135,9 +134,9 @@ def get_all_binance(symbol, kline_size, token, save=False):
 
     if save:
         # Deduplicate before saving
-        query_existing = f'SELECT timestamp FROM public."{tablename}"'
-        existing_timestamps = pd.read_sql(query_existing, operations.db_con)['timestamp']
-        data = data[~data['timestamp'].isin(existing_timestamps)]
+        # query_existing = f'SELECT timestamp FROM public."{tablename}"'
+        # existing_timestamps = pd.read_sql(query_existing, operations.db_con)['timestamp']
+        # data = data[~data['timestamp'].isin(existing_timestamps)]
 
         # Save new, non-duplicated data to the database
         data.to_sql(tablename, operations.db_con, if_exists='append', index=False)

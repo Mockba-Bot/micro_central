@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.tasks.notification_tasks import send_telegram_message_task
+from app.tasks.celery_tasks import send_telegram_message_task
 
 # Define the router
 router = APIRouter()
