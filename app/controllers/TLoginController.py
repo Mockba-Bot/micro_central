@@ -58,6 +58,14 @@ async def read_login(token: int, db: AsyncSession = Depends(get_db)):
 
     return login
 
+@router.get("/tlogin/verify/{token}")
+async def verify_login(token: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TLogin).where(TLogin.token == token))
+    login = result.scalar_one_or_none()
+    if login is None:
+        return {"exists": False}
+    return {"exists": True}    
+
 # Update a TLogin by token
 @router.put("/tlogin/{token}", response_model=TLoginSchema)
 async def update_tlogin(token: int, tlogin: TLoginSchema, db: AsyncSession = Depends(get_db)):
