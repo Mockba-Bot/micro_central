@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.tasks.celery_tasks import get_historical_data_task
-from app.utils.getHistorical import get_all_binance
+from app.utils.getHistorical import get_all_binance, get_historical_data
 
 router = APIRouter()
 
@@ -59,15 +58,11 @@ def query_historical_data(request: HistoricalDataRequest):
         - DataFrame as a JSON object.
     """
     try:
-        task = get_historical_data_task.delay(
+        data_df = get_historical_data(
             pair=request.pair,
             timeframe=request.timeframe,
             values=request.values,
         )
-        result = task.get(timeout=5)  # Wait for the task to complete and get the result
-        if result:
-            return result
-        else:
-            return {"message": "No data found for the given query."}
+        return data_df.to_json(orient="records")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error querying data: {str(e)}")
