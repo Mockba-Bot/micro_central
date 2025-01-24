@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from typing import Any
 from pydantic import BaseModel
 from app.utils.getHistorical import get_all_binance, get_historical_data
 
@@ -45,24 +46,31 @@ def fetch_historical_data(request: BinanceRequest):
 
 
 @router.post("/query-historical-data")
-def query_historical_data(request: HistoricalDataRequest):
+def query_historical_data(request: HistoricalDataRequest) -> Any:
     """
     Query historical data from the database for a trading pair.
 
     Parameters:
-        - pair: The trading pair symbol (e.g., "BTCUSDT").
-        - timeframe: Time interval for klines (e.g., "1h").
-        - values: Date range for data, in the format "start_date|end_date" (e.g., "2024-01-01|2024-01-31").
+        - request: HistoricalDataRequest object containing query parameters.
 
     Returns:
-        - DataFrame as a JSON object.
+        - A JSON object with the historical data or a message if no data is found.
     """
     try:
-        data_df = get_historical_data(
+        # Call the function to fetch data
+        result = get_historical_data(
             pair=request.pair,
             timeframe=request.timeframe,
             values=request.values,
         )
-        return data_df.to_json(orient="records")
+
+        # If data exists, return it as JSON
+        if result is not None and not result.empty:
+            return result.to_dict(orient="records")  # Convert DataFrame to a list of dictionaries
+
+        # If no data is found
+        return {"message": "No data found for the given query."}
+
     except Exception as e:
+        # Handle exceptions and return an HTTP 500 response
         raise HTTPException(status_code=500, detail=f"Error querying data: {str(e)}")
