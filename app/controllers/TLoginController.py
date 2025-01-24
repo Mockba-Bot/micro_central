@@ -7,11 +7,11 @@ from app.database import get_db
 from sqlalchemy.exc import SQLAlchemyError
 from app.utils.security import encrypt, decrypt
 import os
-import aioredis
+import redis.asyncio as redis
 
 # Initialize Redis connection
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost")
-redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 router = APIRouter()
 
@@ -48,16 +48,16 @@ async def read_login(token: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Login not found")
 
     # Decrypt sensitive fields
-    login.api_key = login.api_key
-    login.api_secret = login.api_secret
-    login.wallets = login.wallets if login.wallets else None
+    login.api_key = decrypt(login.api_key)
+    login.api_secret = decrypt(login.api_secret)
+    login.wallets = decrypt(login.wallets) if login.wallets else None
 
     return login
 
 @router.get("/verify-login/{token}")
 async def verify_login(token: int, db: AsyncSession = Depends(get_db)):
     # Check if the login exists in Redis
-    cached_login = await redis.get(f"login:{token}")
+    cached_login = await redis_client.get(f"login:{token}")
     if cached_login:
         return {"exists": True}
 
@@ -69,7 +69,7 @@ async def verify_login(token: int, db: AsyncSession = Depends(get_db)):
         return {"exists": False}
 
     # Store the login in Redis for 8 hours (28800 seconds)
-    await redis.setex(f"login:{token}", 28800, "true")
+    await redis_client.setex(f"login:{token}", 28800, "true")
 
     return {"exists": True}
 
