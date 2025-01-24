@@ -7,11 +7,15 @@ from app.database import get_db
 from sqlalchemy.exc import SQLAlchemyError
 from app.utils.security import encrypt, decrypt
 import os
-import redis.asyncio as redis
+import redis
 
 # Initialize Redis connection
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost")
-redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+try:
+    redis_client = redis.from_url(os.getenv("REDIS_URL"))
+    redis_client.ping()
+except redis.ConnectionError as e:
+    print(f"Redis connection error: {e}")
+    redis_client = None
 
 router = APIRouter()
 
@@ -48,30 +52,19 @@ async def read_login(token: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Login not found")
 
     # Decrypt sensitive fields
-    login.api_key = decrypt(login.api_key)
-    login.api_secret = decrypt(login.api_secret)
-    login.wallets = decrypt(login.wallets) if login.wallets else None
+    login.api_key = login.api_key
+    login.api_secret = login.api_secret
+    login.wallets = login.wallets if login.wallets else None
 
     return login
 
-@router.get("/verify-login/{token}")
+@router.get("/tlogin/verify/{token}")
 async def verify_login(token: int, db: AsyncSession = Depends(get_db)):
-    # Check if the login exists in Redis
-    cached_login = await redis_client.get(f"login:{token}")
-    if cached_login:
-        return {"exists": True}
-
-    # Query the database for the login
     result = await db.execute(select(TLogin).where(TLogin.token == token))
     login = result.scalar_one_or_none()
-
     if login is None:
         return {"exists": False}
-
-    # Store the login in Redis for 8 hours (28800 seconds)
-    await redis_client.setex(f"login:{token}", 28800, "true")
-
-    return {"exists": True}
+    return {"exists": True}    
 
 # Update a TLogin by token
 @router.put("/tlogin/{token}", response_model=TLoginSchema)
