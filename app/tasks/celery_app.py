@@ -24,11 +24,6 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
 )
 
-celery_app.conf.task_queues = {
-    "central": {"exchange": "central", "routing_key": "central"},
-}
-
-celery_app.conf.task_default_queue = "central"  # Default queue for this worker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
