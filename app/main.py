@@ -32,4 +32,4 @@ app.include_router(notification_router, prefix="/api/v1/central", tags=["Notific
 # uvicorn app.main:app --reload
 # redis-cli flushdb
 # redis-cli flushall
-# celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=8 --queues=backtest
+# celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=8 --queues=central
