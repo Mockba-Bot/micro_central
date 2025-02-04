@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import Any
 from pydantic import BaseModel
-from app.utils.getHistorical import get_all_binance, get_historical_data
+from app.utils.getHistorical import get_all_binance, get_historical_data, get_historical_data_for_trade
 
 router = APIRouter()
 
@@ -15,6 +15,11 @@ class HistoricalDataRequest(BaseModel):
     pair: str  # Trading pair, e.g., "BTCUSDT"
     timeframe: str  # Time interval, e.g., "1h"
     values: str  # Date range, e.g., "start_date|end_date"    
+
+class HistoricalDataForTradeRequest(BaseModel):
+    pair: str  # Trading pair, e.g., "BTCUSDT"
+    timeframe: str  # Time interval, e.g., "1h"
+    limit: int  # Number of records to fetch    
 
 @router.post("/historical-data")
 def fetch_historical_data(request: BinanceRequest):
@@ -74,3 +79,33 @@ def query_historical_data(request: HistoricalDataRequest) -> Any:
     except Exception as e:
         # Handle exceptions and return an HTTP 500 response
         raise HTTPException(status_code=500, detail=f"Error querying data: {str(e)}")
+
+@router.post("/query-historical-data-for-trade")
+def query_historical_data_for_trade(request: HistoricalDataForTradeRequest) -> Any:
+    """
+    Query historical data from the database for a trading pair.
+
+    Parameters:
+        - request: HistoricalDataRequest object containing query parameters.
+
+    Returns:
+        - A JSON object with the historical data or a message if no data is found.
+    """
+    try:
+        # Call the function to fetch data
+        result = get_historical_data_for_trade(
+            pair=request.pair,
+            timeframe=request.timeframe,
+            limit=request.limit,
+        )
+
+        # If data exists, return it as JSON
+        if result is not None and not result.empty:
+            return result.to_dict(orient="records")  # Convert DataFrame to a list of dictionaries
+
+        # If no data is found
+        return {"message": "No data found for the given query."}
+
+    except Exception as e:
+        # Handle exceptions and return an HTTP 500 response
+        raise HTTPException(status_code=500, detail=f"Error querying data: {str(e)}")        

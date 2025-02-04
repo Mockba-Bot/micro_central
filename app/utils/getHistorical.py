@@ -148,11 +148,19 @@ def get_all_binance(symbol, kline_size, token, save=False):
 # Fetch historical data from the database
 def get_historical_data(pair, timeframe, values):
     field = '"timestamp"'
-    table = pair + "_" + timeframe
-    f = "'" + values.split('|')[0] + "'"
-    t = "'" + values.split('|')[1] + "'"
-    query = f"SELECT DISTINCT {field}, low, high, volume, close FROM public.\"{table}\" WHERE timestamp >= {f} AND timestamp <= {t} ORDER BY 1"
-    df = pd.read_sql(query, con=operations.db_con)
+    table = f'"{pair}_{timeframe}"'
+    start_date = values.split('|')[0]
+    end_date = values.split('|')[1]
+    
+    query = f"""
+    SELECT DISTINCT {field}, low, high, volume, close
+    FROM public.{table}
+    WHERE timestamp >= %s AND timestamp <= %s
+    ORDER BY 1
+    """
+    
+    # Use parameterized query to avoid SQL injection
+    df = pd.read_sql(query, con=operations.db_con, params=[start_date, end_date])
     
     # Convert columns to numeric types
     df['close'] = pd.to_numeric(df['close'])
@@ -161,6 +169,32 @@ def get_historical_data(pair, timeframe, values):
     df['volume'] = pd.to_numeric(df['volume'])
     
     return df
+
+def get_historical_data_for_trade(pair, timeframe, limit=500):
+    table = f'"{pair}_{timeframe}"'
+    
+    query = f"""
+            WITH recent_data AS (
+                SELECT * 
+                FROM public.{table} 
+                ORDER BY timestamp DESC 
+                LIMIT %s
+            )
+            SELECT * 
+            FROM recent_data 
+            ORDER BY timestamp ASC
+            """
+    
+    # Use parameterized query to avoid SQL injection
+    df = pd.read_sql(query, con=db_con, params=[limit])
+    
+    df['close'] = pd.to_numeric(df['close'])
+    df['high'] = pd.to_numeric(df['high'])
+    df['low'] = pd.to_numeric(df['low'])
+    df['volume'] = pd.to_numeric(df['volume'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+    return df    
     
 # Example usage
 # get_all_binance("NEARUSDT", "5m", "556159355", save=True)
