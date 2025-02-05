@@ -7,7 +7,8 @@ from app.utils.capital import (
     store_capital,
     updateCapitalTimestamp,
     updateCapitalCrypto,
-    get_capital
+    get_capital,
+    get_trader_info
 )
 
 router = APIRouter()
@@ -204,3 +205,17 @@ def get_capital_route(request: GetCapitalRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving capital: {str(e)}")
+
+@router.get("/trader-info")
+def get_trader_info_route():
+    """
+    Fetch information about the trader.
+
+    Returns:
+        - A JSON object with the trader information.
+    """
+    try:
+        result = get_trader_info()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving trader information: {str(e)}")        
