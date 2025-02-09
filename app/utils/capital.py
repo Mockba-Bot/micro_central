@@ -163,11 +163,21 @@ def get_capital(token, pair, timeframe):
         trader_logger.error(f"Error retrieving capital for token {token}, pair {pair}, and timeframe {timeframe}: {e}")
         return None, None, None, None, None, None, None
 
-def get_trader_info():
+def get_trader_info(page: int = 1, page_size: int = 1000):
+    """
+    Fetch trader information in paginated chunks.
+    """
     retry_attempts = 3
     for attempt in range(retry_attempts):
         try:
-            return pd.read_sql("SELECT token, pair, timeframe, gain_threshold, stop_loss_threshold FROM t_signal where signal = 0", con=operations.db_con)
+            offset = (page - 1) * page_size
+            query = f"""
+                SELECT token, pair, timeframe, gain_threshold, stop_loss_threshold
+                FROM t_signal
+                WHERE signal = 0
+                LIMIT {page_size} OFFSET {offset}
+            """
+            return pd.read_sql(query, con=operations.db_con)
         except OperationalError as e:
             trader_logger.error(f"Database connection error: {e}")
             if attempt < retry_attempts - 1:
@@ -175,4 +185,4 @@ def get_trader_info():
                 time.sleep(5)
             else:
                 trader_logger.error("Max retry attempts reached. Exiting.")
-                raise        
+                raise  

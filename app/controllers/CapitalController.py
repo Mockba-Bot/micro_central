@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import Any
 from pydantic import BaseModel
 from app.utils.capital import (
@@ -207,15 +207,19 @@ def get_capital_route(request: GetCapitalRequest):
         raise HTTPException(status_code=500, detail=f"Error retrieving capital: {str(e)}")
 
 @router.get("/trader-info")
-def get_trader_info_route():
+def get_trader_info_route(page: int = Query(1, ge=1), page_size: int = Query(1000, ge=1)):
     """
-    Fetch information about the trader.
+    Fetch information about the trader in paginated chunks.
+
+    Parameters:
+        - page: The page number (default is 1).
+        - page_size: The number of items per page (default is 1000).
 
     Returns:
         - A JSON object with the trader information.
     """
     try:
-        result = get_trader_info()
-        return result
+        result = get_trader_info(page, page_size)
+        return result.to_dict(orient="records")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving trader information: {str(e)}")        
+        raise HTTPException(status_code=500, detail=f"Error retrieving trader information: {str(e)}")

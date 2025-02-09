@@ -16,6 +16,7 @@ class TSignal(Base):
     
     __table_args__ = (
         Index('idx2_token_pair_timeframe', 'token', 'pair', 'timeframe'),
+        Index('idx_signal', 'signal'),  # Added index for the signal field
     )
 
     def __repr__(self):

@@ -25,6 +25,7 @@ app.include_router(binance_router, prefix="/api/v1/central", tags=["Binance"])
 app.include_router(notification_router, prefix="/api/v1/central", tags=["Notification"])
 
 # run update of tables
+# alembic init alembic solo la primera vez
 # alembic revision --autogenerate -m "initial tables"
 # commit
 # alembic upgrade head
@@ -33,3 +34,4 @@ app.include_router(notification_router, prefix="/api/v1/central", tags=["Notific
 # redis-cli flushdb
 # redis-cli flushall
 # celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=8 --queues=central
+# celery -A app.tasks.celery_app.celery_app beat --loglevel=info
