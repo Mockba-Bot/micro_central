@@ -7,7 +7,6 @@ from fastapi import FastAPI
 from app.controllers import (
     tlogin_router,
     tsignal_router,
-    training_router,
     t_bot_status_router,
     binance_router,
     notification_router
@@ -19,7 +18,6 @@ app = FastAPI()
 # Include the routers
 app.include_router(tlogin_router, prefix="/api/v1/central", tags=["TLogin"])
 app.include_router(tsignal_router, prefix="/api/v1/central", tags=["TSignal"])
-app.include_router(training_router, prefix="/api/v1/central", tags=["TrainingInProgress"])
 app.include_router(t_bot_status_router, prefix="/api/v1/central", tags=["TBotStatus"])
 app.include_router(binance_router, prefix="/api/v1/central", tags=["Binance"])
 app.include_router(notification_router, prefix="/api/v1/central", tags=["Notification"])
