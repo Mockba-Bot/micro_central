@@ -1,9 +1,16 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import Any
 from pydantic import BaseModel
 from app.utils.getHistorical import get_all_binance, get_historical_data, get_historical_data_for_trade
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
+
+# Initialize the rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 class BinanceRequest(BaseModel):
     symbol: str
@@ -22,7 +29,8 @@ class HistoricalDataForTradeRequest(BaseModel):
     limit: int  # Number of records to fetch    
 
 @router.post("/historical-data")
-def fetch_historical_data(request: BinanceRequest):
+@limiter.limit("10/second")
+async def fetch_historical_data(request: Request, binance_request: BinanceRequest):
     """
     Fetch historical data for a Binance symbol.
 
@@ -37,10 +45,10 @@ def fetch_historical_data(request: BinanceRequest):
     """
     try:
         data_df = get_all_binance(
-            symbol=request.symbol,
-            kline_size=request.kline_size,
-            token=request.token,
-            save=request.save,
+            symbol=binance_request.symbol,
+            kline_size=binance_request.kline_size,
+            token=binance_request.token,
+            save=binance_request.save,
         )
         if data_df is not None:
             return {"message": "Data fetched successfully"}
@@ -49,9 +57,9 @@ def fetch_historical_data(request: BinanceRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
-
 @router.post("/query-historical-data")
-def query_historical_data(request: HistoricalDataRequest) -> Any:
+@limiter.limit("10/second")
+async def query_historical_data(request: Request, historical_data_request: HistoricalDataRequest) -> Any:
     """
     Query historical data from the database for a trading pair.
 
@@ -64,9 +72,9 @@ def query_historical_data(request: HistoricalDataRequest) -> Any:
     try:
         # Call the function to fetch data
         result = get_historical_data(
-            pair=request.pair,
-            timeframe=request.timeframe,
-            values=request.values,
+            pair=historical_data_request.pair,
+            timeframe=historical_data_request.timeframe,
+            values=historical_data_request.values,
         )
 
         # If data exists, return it as JSON
@@ -81,7 +89,8 @@ def query_historical_data(request: HistoricalDataRequest) -> Any:
         raise HTTPException(status_code=500, detail=f"Error querying data: {str(e)}")
 
 @router.post("/query-historical-data-for-trade")
-def query_historical_data_for_trade(request: HistoricalDataForTradeRequest) -> Any:
+@limiter.limit("10/second")
+async def query_historical_data_for_trade(request: Request, historical_data_for_trade_request: HistoricalDataForTradeRequest) -> Any:
     """
     Query historical data from the database for a trading pair.
 
@@ -94,9 +103,9 @@ def query_historical_data_for_trade(request: HistoricalDataForTradeRequest) -> A
     try:
         # Call the function to fetch data
         result = get_historical_data_for_trade(
-            pair=request.pair,
-            timeframe=request.timeframe,
-            limit=request.limit,
+            pair=historical_data_for_trade_request.pair,
+            timeframe=historical_data_for_trade_request.timeframe,
+            limit=historical_data_for_trade_request.limit,
         )
 
         # If data exists, return it as JSON
@@ -108,4 +117,12 @@ def query_historical_data_for_trade(request: HistoricalDataForTradeRequest) -> A
 
     except Exception as e:
         # Handle exceptions and return an HTTP 500 response
-        raise HTTPException(status_code=500, detail=f"Error querying data: {str(e)}")        
+        raise HTTPException(status_code=500, detail=f"Error querying data: {str(e)}")
+
+# Add exception handler for rate limit exceeded
+@router.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."}
+    )

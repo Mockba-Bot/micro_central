@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models import TLogin
@@ -8,6 +8,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.utils.security import encrypt, decrypt
 import os
 import redis
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 
 # Initialize Redis connection
 try:
@@ -19,8 +23,12 @@ except redis.ConnectionError as e:
 
 router = APIRouter()
 
+# Initialize the rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Create a new TLogin
 @router.post("/tlogin", response_model=TLoginSchema)
+@limiter.limit("10/second")
 async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
     try:
         # Encrypt sensitive fields
@@ -45,6 +53,7 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
 
 # Retrieve a TLogin by token
 @router.get("/tlogin/{token}", response_model=TLoginSchema)
+@limiter.limit("10/second")
 async def read_login(token: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TLogin).where(TLogin.token == token))
     login = result.scalar_one_or_none()
@@ -52,22 +61,25 @@ async def read_login(token: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Login not found")
 
     # Decrypt sensitive fields
-    login.api_key = login.api_key
-    login.api_secret = login.api_secret
-    login.wallets = login.wallets if login.wallets else None
+    login.api_key = decrypt(login.api_key)
+    login.api_secret = decrypt(login.api_secret)
+    login.wallets = decrypt(login.wallets) if login.wallets else None
 
     return login
 
+# Verify if a TLogin exists by token
 @router.get("/tlogin/verify/{token}")
+@limiter.limit("10/second")
 async def verify_login(token: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TLogin).where(TLogin.token == token))
     login = result.scalar_one_or_none()
     if login is None:
         return {"exists": False}
-    return {"exists": True}    
+    return {"exists": True}
 
 # Update a TLogin by token
 @router.put("/tlogin/{token}", response_model=TLoginSchema)
+@limiter.limit("10/second")
 async def update_tlogin(token: int, tlogin: TLoginSchema, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TLogin).filter(TLogin.token == token))
@@ -95,4 +107,12 @@ async def update_tlogin(token: int, tlogin: TLoginSchema, db: AsyncSession = Dep
         return existing_tlogin
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# Add exception handler for rate limit exceeded
+@router.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."}
+    )
 

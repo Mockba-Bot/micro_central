@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Any
 from pydantic import BaseModel
 from app.utils.capital import (
@@ -10,8 +10,16 @@ from app.utils.capital import (
     get_capital,
     get_trader_info
 )
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
+from datetime import datetime
 
 router = APIRouter()
+
+# Initialize the rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 class CapitalAccumulatedRequest(BaseModel):
     token: str
@@ -54,6 +62,7 @@ class GetCapitalRequest(BaseModel):
     timeframe: str
 
 @router.get("/capital/accumulated")
+@limiter.limit("10/second")
 def get_capital_accumulated_route(request: CapitalAccumulatedRequest):
     """
     Fetch the accumulated capital for a given token, pair, and timeframe.
@@ -73,6 +82,7 @@ def get_capital_accumulated_route(request: CapitalAccumulatedRequest):
         raise HTTPException(status_code=500, detail=f"Error retrieving capital accumulated: {str(e)}")
 
 @router.put("/capital/accumulated")
+@limiter.limit("10/second")
 def update_capital_accumulated_route(request: UpdateCapitalAccumulatedRequest):
     """
     Update the accumulated capital for a given token, pair, and timeframe.
@@ -93,6 +103,7 @@ def update_capital_accumulated_route(request: UpdateCapitalAccumulatedRequest):
         raise HTTPException(status_code=500, detail=f"Error updating capital accumulated: {str(e)}")
 
 @router.post("/capital")
+@limiter.limit("10/second")
 def store_capital_route(request: StoreCapitalRequest):
     """
     Store capital and related data for a given token, pair, and timeframe.
@@ -130,6 +141,7 @@ def store_capital_route(request: StoreCapitalRequest):
         raise HTTPException(status_code=500, detail=f"Error storing capital: {str(e)}")
 
 @router.put("/capital/timestamp")
+@limiter.limit("10/second")
 def update_capital_timestamp_route(request: UpdateCapitalTimestampRequest):
     """
     Update the timestamp for a given token, pair, and timeframe.
@@ -155,6 +167,7 @@ def update_capital_timestamp_route(request: UpdateCapitalTimestampRequest):
         raise HTTPException(status_code=500, detail=f"Error updating timestamp: {str(e)}")
 
 @router.put("/capital/crypto")
+@limiter.limit("10/second")
 def update_capital_crypto_route(request: UpdateCapitalCryptoRequest):
     """
     Update the crypto amount for a given token, pair, and timeframe.
@@ -180,6 +193,7 @@ def update_capital_crypto_route(request: UpdateCapitalCryptoRequest):
         raise HTTPException(status_code=500, detail=f"Error updating crypto amount: {str(e)}")
 
 @router.get("/capital")
+@limiter.limit("10/second")
 def get_capital_route(request: GetCapitalRequest):
     """
     Fetch the capital data for a given token, pair, and timeframe.
@@ -207,6 +221,7 @@ def get_capital_route(request: GetCapitalRequest):
         raise HTTPException(status_code=500, detail=f"Error retrieving capital: {str(e)}")
 
 @router.get("/trader-info")
+@limiter.limit("10/second")
 def get_trader_info_route(page: int = Query(1, ge=1), page_size: int = Query(1000, ge=1)):
     """
     Fetch information about the trader in paginated chunks.
@@ -223,3 +238,11 @@ def get_trader_info_route(page: int = Query(1, ge=1), page_size: int = Query(100
         return result.to_dict(orient="records")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving trader information: {str(e)}")
+
+# Add exception handler for rate limit exceeded
+@router.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."}
+    )
