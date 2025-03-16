@@ -8,18 +8,17 @@ from app.controllers import (
     tlogin_router,
     tsignal_router,
     t_bot_status_router,
-    binance_router,
+    orderly_router,
     notification_router
 )
 
 app = FastAPI()
 
-
 # Include the routers
 app.include_router(tlogin_router, prefix="/api/v1/central", tags=["TLogin"])
 app.include_router(tsignal_router, prefix="/api/v1/central", tags=["TSignal"])
 app.include_router(t_bot_status_router, prefix="/api/v1/central", tags=["TBotStatus"])
-app.include_router(binance_router, prefix="/api/v1/central", tags=["Binance"])
+app.include_router(orderly_router, prefix="/api/v1/central", tags=["Orderly"])
 app.include_router(notification_router, prefix="/api/v1/central", tags=["Notification"])
 
 # run update of tables
@@ -31,5 +30,5 @@ app.include_router(notification_router, prefix="/api/v1/central", tags=["Notific
 # uvicorn app.main:app --reload
 # redis-cli flushdb
 # redis-cli flushall
-# celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=8 --queues=central
+# celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=2 --queues=central
 # celery -A app.tasks.celery_app.celery_app beat --loglevel=info

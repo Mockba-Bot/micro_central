@@ -11,6 +11,7 @@ load_dotenv(dotenv_path=".env.micro.central")
 # access the environment variables
 host = os.getenv("HOST")
 database = os.getenv("DATABASE")
+database_historical = os.getenv("DATABASE_HISTORICAL")
 user = os.getenv("USR")
 password = os.getenv("PASSWD")
 
@@ -25,6 +26,7 @@ password = os.getenv("PASSWD")
 #     raise ValueError("One or more environment variables are missing")
 
 db_con = create_engine(f"postgresql://{user}:{password}@{host}:5432/{database}")   
+db_con_historical = create_engine(f"postgresql://{user}:{password}@{host}:5432/{database_historical}")
 df = ""
 
 def getUser(token):

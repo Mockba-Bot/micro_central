@@ -2,24 +2,18 @@
 import sys
 import os
 import pandas as pd
-import math
 import os.path
-import time
-from binance.client import Client
-from datetime import datetime
-from dateutil import parser
 import redis
 import pickle
 from dotenv import load_dotenv
 # # Import custom operations module for database connection
 # Add the project root to sys.path
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from app.utils import operations, security
+#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from app.utils import operations
 from sqlalchemy.sql import text
 
 # Load environment variables from the specified .env file
 load_dotenv(dotenv_path=".env.micro.central")
-
 # Initialize Redis connection
 try:
     redis_client = redis.from_url(os.getenv("REDIS_URL"))
@@ -59,7 +53,7 @@ def get_historical_data(pair, timeframe, values):
     """)
     
     # Use parameterized query to avoid SQL injection
-    df = pd.read_sql(query, con=operations.db_con, params={"start_time": start_date, "end_time": end_date})
+    df = pd.read_sql(query, con=operations.db_con_historical, params={"start_time": start_date, "end_time": end_date})
     
     # Convert columns to numeric types
     df['close'] = pd.to_numeric(df['close'])
@@ -68,3 +62,11 @@ def get_historical_data(pair, timeframe, values):
     df['volume'] = pd.to_numeric(df['volume'])
     
     return df
+
+
+# Fetch historical data for trading
+# pair = "PERP_APT_USDT"
+# timeframe = "1h"
+# values = "2025-01-01|2025-01-31"
+# result = get_historical_data(pair, timeframe, values)
+# print(result.head())

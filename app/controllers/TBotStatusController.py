@@ -5,19 +5,13 @@ from app.models import TBotStatus
 from app.schemas import TBotStatusSchema
 from app.database import get_db
 from sqlalchemy.exc import SQLAlchemyError
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
-# Initialize the rate limiter
-limiter = Limiter(key_func=get_remote_address)
 
 # Create a new TBotStatus
 @router.post("/t_bot_status", response_model=TBotStatusSchema)
-@limiter.limit("10/second")
 async def create_t_bot_status(status: TBotStatusSchema, db: AsyncSession = Depends(get_db)):
     try:
         new_status = TBotStatus(
@@ -35,7 +29,6 @@ async def create_t_bot_status(status: TBotStatusSchema, db: AsyncSession = Depen
 
 # Retrieve a TBotStatus by token, pair, and timeframe
 @router.get("/t_bot_status/{token}/{pair}/{timeframe}", response_model=TBotStatusSchema)
-@limiter.limit("10/second")
 async def get_t_bot_status(token: int, pair: str, timeframe: str, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TBotStatus).filter(
@@ -52,7 +45,6 @@ async def get_t_bot_status(token: int, pair: str, timeframe: str, db: AsyncSessi
 
 # Update an existing TBotStatus by token, pair, and timeframe
 @router.put("/t_bot_status/{token}/{pair}/{timeframe}", response_model=TBotStatusSchema)
-@limiter.limit("10/second")
 async def update_t_bot_status(token: int, pair: str, timeframe: str, status: TBotStatusSchema, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TBotStatus).filter(
@@ -76,7 +68,6 @@ async def update_t_bot_status(token: int, pair: str, timeframe: str, status: TBo
 
 # Delete a TBotStatus by token, pair, and timeframe
 @router.delete("/t_bot_status/{token}/{pair}/{timeframe}")
-@limiter.limit("10/second")
 async def delete_t_bot_status(token: int, pair: str, timeframe: str, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TBotStatus).filter(
@@ -94,10 +85,3 @@ async def delete_t_bot_status(token: int, pair: str, timeframe: str, db: AsyncSe
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# Add exception handler for rate limit exceeded
-@router.exception_handler(RateLimitExceeded)
-async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    return JSONResponse(
-        status_code=429,
-        content={"detail": "Rate limit exceeded. Please try again later."}
-    )

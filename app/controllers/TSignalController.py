@@ -5,19 +5,12 @@ from app.models import TSignal
 from app.schemas import TSignalSchema
 from app.database import get_db
 from sqlalchemy.exc import SQLAlchemyError
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
-# Initialize the rate limiter
-limiter = Limiter(key_func=get_remote_address)
-
 # Create a new TSignal
 @router.post("/tsignal", response_model=TSignalSchema)
-@limiter.limit("10/second")
 async def create_tsignal(tsignal: TSignalSchema, db: AsyncSession = Depends(get_db)):
     try:
         new_tsignal = TSignal(
@@ -38,7 +31,6 @@ async def create_tsignal(tsignal: TSignalSchema, db: AsyncSession = Depends(get_
 
 # Retrieve a TSignal by ID
 @router.get("/tsignal/{id}", response_model=TSignalSchema)
-@limiter.limit("10/second")
 async def get_tsignal(id: int, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TSignal).filter(TSignal.id == id))
@@ -51,7 +43,6 @@ async def get_tsignal(id: int, db: AsyncSession = Depends(get_db)):
 
 # Update a TSignal by ID
 @router.put("/tsignal/{id}", response_model=TSignalSchema)
-@limiter.limit("10/second")
 async def update_tsignal(id: int, tsignal: TSignalSchema, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TSignal).filter(TSignal.id == id))
@@ -76,7 +67,6 @@ async def update_tsignal(id: int, tsignal: TSignalSchema, db: AsyncSession = Dep
 
 # Delete a TSignal by ID
 @router.delete("/tsignal/{id}")
-@limiter.limit("10/second")
 async def delete_tsignal(id: int, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TSignal).filter(TSignal.id == id))
@@ -90,10 +80,3 @@ async def delete_tsignal(id: int, db: AsyncSession = Depends(get_db)):
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# Add exception handler for rate limit exceeded
-@router.exception_handler(RateLimitExceeded)
-async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    return JSONResponse(
-        status_code=429,
-        content={"detail": "Rate limit exceeded. Please try again later."}
-    )
