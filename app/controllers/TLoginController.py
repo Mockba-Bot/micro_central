@@ -5,18 +5,25 @@ from app.models import TLogin
 from app.schemas.TLoginSchema import TLogin as TLoginSchema, TLoginCreate
 from app.database import get_db
 from sqlalchemy.exc import SQLAlchemyError
-from app.utils.security import encrypt, decrypt
 import os
-import redis
-from fastapi.responses import JSONResponse
+from redis import asyncio as aioredis
 
-# Initialize Redis connection
-try:
-    redis_client = redis.from_url(os.getenv("REDIS_URL"))
-    redis_client.ping()
-except redis.ConnectionError as e:
-    print(f"Redis connection error: {e}")
-    redis_client = None
+from fastapi import FastAPI
+
+app = FastAPI()
+redis_client = None
+
+async def startup_event():
+    global redis_client
+    try:
+        redis_client = aioredis.from_url(os.getenv("REDIS_URL"))
+        await redis_client.ping()
+    except Exception as e:
+        print(f"Redis connection error: {e}")
+        redis_client = None
+
+async def get_redis():
+    return redis_client
 
 router = APIRouter()
 
@@ -27,15 +34,12 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
         # Encrypt sensitive fields
         new_tlogin = TLogin(
             token=tlogin.token,
-            api_key=encrypt(tlogin.api_key),
-            api_secret=encrypt(tlogin.api_secret),
             name=tlogin.name,
             last_name=tlogin.last_name,
             is_owner=tlogin.is_owner,
             want_signal=tlogin.want_signal,
-            wallets=encrypt(tlogin.wallets) if tlogin.wallets else None,
             creation_date=tlogin.creation_date,
-            end_subscription=tlogin.end_subscription
+            language=tlogin.language
         )
         db.add(new_tlogin)
         await db.commit()
@@ -47,30 +51,36 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
 # Retrieve a TLogin by token
 @router.get("/tlogin/{token}", response_model=TLoginSchema)
 async def read_login(token: int, db: AsyncSession = Depends(get_db)):
+    # Get Redis client
+    redis_client = await get_redis()
+    if redis_client:
+        # Check Redis cache first
+        cached_login = await redis_client.get(f"user_data:{token}")
+        if cached_login:
+            try:
+                # Try to decode as UTF-8 first
+                cached_login = cached_login.decode("utf-8")
+                return TLoginSchema.model_validate_json(cached_login)
+            except UnicodeDecodeError:
+                # If UTF-8 fails, try to parse directly from bytes
+                return TLoginSchema.model_validate_json(cached_login)
+
+    # If not in cache, fetch from database
     result = await db.execute(select(TLogin).where(TLogin.token == token))
     login = result.scalar_one_or_none()
     if login is None:
         raise HTTPException(status_code=404, detail="Login not found")
 
-    # Decrypt sensitive fields
-    login.api_key = decrypt(login.api_key)
-    login.api_secret = decrypt(login.api_secret)
-    login.wallets = decrypt(login.wallets) if login.wallets else None
+    # Cache the result in Redis if available
+    if redis_client:
+        await redis_client.set(f"user_data:{token}", login.json())
 
     return login
 
-# Verify if a TLogin exists by token
-@router.get("/tlogin/verify/{token}")
-async def verify_login(token: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TLogin).where(TLogin.token == token))
-    login = result.scalar_one_or_none()
-    if login is None:
-        return {"exists": False}
-    return {"exists": True}
 
 # Update a TLogin by token
 @router.put("/tlogin/{token}", response_model=TLoginSchema)
-async def update_tlogin(token: int, tlogin: TLoginSchema, db: AsyncSession = Depends(get_db)):
+async def update_tlogin(token: int, tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(TLogin).filter(TLogin.token == token))
         existing_tlogin = result.scalars().first()
@@ -78,20 +88,18 @@ async def update_tlogin(token: int, tlogin: TLoginSchema, db: AsyncSession = Dep
             raise HTTPException(status_code=404, detail="TLogin not found")
 
         # Update fields with encrypted data
-        existing_tlogin.api_key = encrypt(tlogin.api_key)
-        existing_tlogin.api_secret = encrypt(tlogin.api_secret)
         existing_tlogin.name = tlogin.name
         existing_tlogin.last_name = tlogin.last_name
         existing_tlogin.is_owner = tlogin.is_owner
         existing_tlogin.want_signal = tlogin.want_signal
-        existing_tlogin.wallets = encrypt(tlogin.wallets) if tlogin.wallets else None
-        existing_tlogin.creation_date = tlogin.creation_date
-        existing_tlogin.end_subscription = tlogin.end_subscription
+        existing_tlogin.language = tlogin.language
 
         await db.commit()
 
         # Remove the Redis cache for the updated user
-        redis_client.delete(f"user_data:{token}")
+        redis_client = await get_redis()
+        if redis_client:
+            await redis_client.delete(f"user_data:{token}")
 
         await db.refresh(existing_tlogin)
         return existing_tlogin

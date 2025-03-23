@@ -1,18 +1,15 @@
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime
 
 class TLoginBase(BaseModel):
     token: int
-    api_key: Optional[str]
-    api_secret: Optional[str]
     name: Optional[str]
     last_name: Optional[str]
     is_owner: bool = False
     want_signal: bool = True
-    wallets: Optional[dict]
     creation_date: datetime
-    end_subscription: date
+    language: str = 'es'
 
 class TLoginCreate(TLoginBase):
     pass
