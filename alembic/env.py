@@ -16,7 +16,7 @@ fileConfig(config.config_file_name)
 # add your model's MetaData object here
 # for 'autogenerate' support
 from app.database import Base  # Import your Base
-from app.models.TSignal import TSignal  # Import your models
+from app.models.TLogin import TLogin  # Import your models
 # Add other models as needed
 target_metadata = Base.metadata
 

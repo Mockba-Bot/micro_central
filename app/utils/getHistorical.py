@@ -46,7 +46,7 @@ def get_historical_data(pair, timeframe, values):
     start_date, end_date = values.split('|')
     
     query = text(f"""
-    SELECT start_timestamp, low, high, volume, close
+    SELECT start_timestamp, low, high, volume, open, close
     FROM public.{table}
     WHERE start_timestamp >= :start_time AND start_timestamp <= :end_time
     ORDER BY 1

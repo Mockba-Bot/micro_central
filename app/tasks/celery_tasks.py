@@ -6,5 +6,4 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(queue="central")
 def send_telegram_message_task(token, message):
-    logger.info(f"Sending telegram message to {token}")
     send_telegram_message(token, message)

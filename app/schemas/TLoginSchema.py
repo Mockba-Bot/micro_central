@@ -4,9 +4,7 @@ from datetime import datetime
 
 class TLoginBase(BaseModel):
     token: int
-    name: Optional[str]
-    last_name: Optional[str]
-    is_owner: bool = False
+    wallet_address: Optional[str]
     want_signal: bool = True
     creation_date: datetime
     language: str = 'es'
@@ -19,3 +17,13 @@ class TLogin(TLoginBase):
 
     class Config:
         orm_mode = True
+
+class LoginRequest(BaseModel):
+    """Request model for MetaMask login"""
+    wallet_address: str
+    signature: str
+    message: str
+
+class ManualLoginRequest(BaseModel):
+    """Request model for manual login (testing)"""
+    wallet_address: str

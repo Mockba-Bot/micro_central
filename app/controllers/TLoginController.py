@@ -34,9 +34,7 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
         # Encrypt sensitive fields
         new_tlogin = TLogin(
             token=tlogin.token,
-            name=tlogin.name,
-            last_name=tlogin.last_name,
-            is_owner=tlogin.is_owner,
+            wallet_address=tlogin.wallet_address,
             want_signal=tlogin.want_signal,
             creation_date=tlogin.creation_date,
             language=tlogin.language
@@ -88,9 +86,6 @@ async def update_tlogin(token: int, tlogin: TLoginCreate, db: AsyncSession = Dep
             raise HTTPException(status_code=404, detail="TLogin not found")
 
         # Update fields with encrypted data
-        existing_tlogin.name = tlogin.name
-        existing_tlogin.last_name = tlogin.last_name
-        existing_tlogin.is_owner = tlogin.is_owner
         existing_tlogin.want_signal = tlogin.want_signal
         existing_tlogin.language = tlogin.language
 

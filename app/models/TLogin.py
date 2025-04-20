@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, BigInteger, String, Boolean, DateTime
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import Base
 
 class TLogin(Base):
@@ -7,11 +7,9 @@ class TLogin(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     token = Column(BigInteger, nullable=False, unique=True)
-    name = Column(String)
-    last_name = Column(String)
-    is_owner = Column(Boolean, default=False, nullable=False)
+    wallet_address = Column(String, unique=True)  # Make wallet_address unique
     want_signal = Column(Boolean, default=True)
-    creation_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    creation_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     language = Column(String, default='es')
 
     def __repr__(self):
