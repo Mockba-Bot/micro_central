@@ -1,20 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Body
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import jwt
 from eth_account.messages import defunct_hash_message
 from eth_account import Account
-from typing import Dict, Optional
 import os
 from pydantic import BaseModel
+from typing import Set
 
 router = APIRouter()
 security = HTTPBearer()
 
-# Session store for refresh tokens (in production, use Redis instead)
-active_sessions: Dict[str, dict] = {}
+# JWT Configuration
+JWT_SECRET = os.getenv("JWT_SECRET")
+active_tokens: Set[str] = set()  # In-memory token store (use Redis in production)
 
-# Models
 class LoginRequest(BaseModel):
     message: str
     signature: str
@@ -23,43 +23,27 @@ class LoginRequest(BaseModel):
 class ManualLoginRequest(BaseModel):
     user_id: str
 
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-class LogoutRequest(BaseModel):
-    refresh_token: str
-
-# JWT Configuration
-JWT_SECRET = os.getenv("JWT_SECRET")
-REFRESH_SECRET = JWT_SECRET + "-refresh"
-
-def generate_token(payload: dict, expires_delta: Optional[timedelta] = None) -> str:
-    to_encode = payload.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(hours=1)
-    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
-    return jwt.encode(to_encode, JWT_SECRET, algorithm="HS256")
-
-def generate_refresh_token(payload: dict) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=7)
-    payload.update({"exp": expire, "iat": datetime.now(timezone.utc)})
-    return jwt.encode(payload, REFRESH_SECRET, algorithm="HS256")
+def generate_token(payload: dict) -> str:
+    """Generate session token without expiration"""
+    payload.update({
+        "iat": datetime.now(timezone.utc),
+        "jti": os.urandom(16).hex()  # Unique token identifier
+    })
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    active_tokens.add(token)  # Track active tokens
+    return token
 
 def verify_token(token: str) -> Optional[dict]:
+    """Verify token is valid and active"""
     try:
+        if token not in active_tokens:
+            return None
         return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
     except jwt.PyJWTError:
         return None
 
-def verify_refresh_token(token: str) -> Optional[dict]:
-    try:
-        return jwt.decode(token, REFRESH_SECRET, algorithms=["HS256"])
-    except jwt.PyJWTError:
-        return None
-
 def verify_metamask_signature(wallet_address: str, signature: str, message: str) -> bool:
+    """Verify MetaMask signature"""
     try:
         message_hash = defunct_hash_message(text=message)
         recovered_address = Account.recover_message(message_hash, signature=signature)
@@ -69,7 +53,7 @@ def verify_metamask_signature(wallet_address: str, signature: str, message: str)
 
 @router.post("/auth/wallet-login")
 async def wallet_login(request: LoginRequest):
-    """Authenticate using MetaMask signature with JWT and refresh token"""
+    """Authenticate using MetaMask signature"""
     if not verify_metamask_signature(
         request.wallet_address,
         request.signature,
@@ -77,91 +61,38 @@ async def wallet_login(request: LoginRequest):
     ):
         raise HTTPException(status_code=401, detail="Invalid signature")
     
-    payload = {"wallet_address": request.wallet_address.lower()}
-    token = generate_token(payload)
-    refresh_token = generate_refresh_token(payload)
-    
-    # Store refresh token (in production, use Redis with expiration)
-    active_sessions[refresh_token] = {
-        "wallet_address": request.wallet_address.lower(),
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).timestamp()
-    }
-    
-    return {
-        "token": token,
-        "refresh_token": refresh_token,
-        "expires_in": 3600
-    }
+    token = generate_token({"wallet_address": request.wallet_address.lower()})
+    return {"token": token}
 
 @router.post("/auth/manual-login")
 async def manual_login(request: ManualLoginRequest):
-    """Manual login for testing with JWT and refresh token"""
-    payload = {"user_id": request.user_id}
-    token = generate_token(payload)
-    refresh_token = generate_refresh_token(payload)
+    """Manual login for testing (bypasses MetaMask)"""
+    if not request.user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
     
-    active_sessions[refresh_token] = {
-        "user_id": request.user_id,
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).timestamp()
-    }
-    
-    return {
-        "token": token,
-        "refresh_token": refresh_token,
-        "expires_in": 3600
-    }
-
-@router.post("/auth/refresh")
-async def refresh_token(request: RefreshRequest):
-    """Refresh access token using refresh token"""
-    if not request.refresh_token or request.refresh_token not in active_sessions:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-    
-    session = active_sessions[request.refresh_token]
-    if datetime.now(timezone.utc).timestamp() > session["expires_at"]:
-        del active_sessions[request.refresh_token]
-        raise HTTPException(status_code=401, detail="Refresh token expired")
-    
-    # Verify the refresh token structure
-    payload = verify_refresh_token(request.refresh_token)
-    if not payload:
-        del active_sessions[request.refresh_token]
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-    
-    # Generate new tokens
-    new_token = generate_token(session)
-    new_refresh_token = generate_refresh_token(session)
-    
-    # Update session
-    del active_sessions[request.refresh_token]
-    active_sessions[new_refresh_token] = {
-        **session,
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).timestamp()
-    }
-    
-    return {
-        "token": new_token,
-        "refresh_token": new_refresh_token,
-        "expires_in": 3600
-    }
+    token = generate_token({"user_id": request.user_id})
+    return {"token": token}
 
 @router.post("/auth/logout")
-async def logout(request: LogoutRequest):
-    """Invalidate refresh token"""
-    if request.refresh_token in active_sessions:
-        del active_sessions[request.refresh_token]
+async def logout(authorization: HTTPAuthorizationCredentials = Depends(security)):
+    """Remove token from active sessions"""
+    token = authorization.credentials
+    if token in active_tokens:
+        active_tokens.remove(token)
     return {"success": True}
 
 @router.get("/auth/verify")
-async def verify_token(authorization: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify JWT token validity"""
-    token = authorization.credentials
-    payload = verify_token(token)
+async def verify_token(auth: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify token validity"""
+    payload = verify_token(auth.credentials)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
     
-    return {
-        "valid": True,
-        "user": payload.get("user_id"),
-        "wallet": payload.get("wallet_address")
-    }
+    # Return different fields based on login method
+    response = {"valid": True}
+    if "wallet_address" in payload:
+        response["wallet"] = payload["wallet_address"]
+    if "user_id" in payload:
+        response["user_id"] = payload["user_id"]
+    
+    return response
