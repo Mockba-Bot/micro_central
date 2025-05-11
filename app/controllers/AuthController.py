@@ -6,7 +6,7 @@ from eth_account.messages import defunct_hash_message
 from eth_account import Account
 import os
 from pydantic import BaseModel
-from typing import Set
+from typing import Set, Optional
 
 router = APIRouter()
 security = HTTPBearer()
