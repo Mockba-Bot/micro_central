@@ -13,7 +13,7 @@ security = HTTPBearer()
 
 # JWT Configuration
 JWT_SECRET = os.getenv("JWT_SECRET")
-active_tokens: Set[str] = set()  # In-memory token store (use Redis in production)
+# Stateless tokens - no active tracking
 
 class LoginRequest(BaseModel):
     message: str
@@ -23,21 +23,18 @@ class LoginRequest(BaseModel):
 class ManualLoginRequest(BaseModel):
     user_id: str
 
-def generate_token(payload: dict) -> str:
-    """Generate session token without expiration"""
+def generate_token(payload: dict, expires_in: int = 3600) -> str:
+    """Generate session token with expiration"""
     payload.update({
         "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc).timestamp() + expires_in,
         "jti": os.urandom(16).hex()  # Unique token identifier
     })
-    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-    active_tokens.add(token)  # Track active tokens
-    return token
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 def validate_token(token: str) -> Optional[dict]:
     """Verify token is valid and active"""
     try:
-        if token not in active_tokens:
-            return None
         return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
     except jwt.PyJWTError:
         return None
@@ -61,7 +58,9 @@ async def wallet_login(request: LoginRequest):
     ):
         raise HTTPException(status_code=401, detail="Invalid signature")
     
-    token = generate_token({"wallet_address": request.wallet_address.lower()})
+    token = generate_token(
+        {"wallet_address": request.wallet_address.lower()}
+    )
     return {"token": token}
 
 @router.post("/auth/manual-login")
@@ -70,15 +69,15 @@ async def manual_login(request: ManualLoginRequest):
     if not request.user_id:
         raise HTTPException(status_code=400, detail="User ID required")
     
-    token = generate_token({"user_id": request.user_id})
+    token = generate_token(
+        {"user_id": request.user_id}
+    )
     return {"token": token}
 
 @router.post("/auth/logout")
 async def logout(authorization: HTTPAuthorizationCredentials = Depends(security)):
     """Remove token from active sessions"""
-    token = authorization.credentials
-    if token in active_tokens:
-        active_tokens.remove(token)
+    # Stateless tokens - logout handled client-side
     return {"success": True}
 
 @router.get("/auth/verify")
