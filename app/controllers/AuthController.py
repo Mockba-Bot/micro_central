@@ -33,7 +33,7 @@ def generate_token(payload: dict) -> str:
     active_tokens.add(token)  # Track active tokens
     return token
 
-def verify_token(token: str) -> Optional[dict]:
+def validate_token(token: str) -> Optional[dict]:
     """Verify token is valid and active"""
     try:
         if token not in active_tokens:
@@ -82,9 +82,9 @@ async def logout(authorization: HTTPAuthorizationCredentials = Depends(security)
     return {"success": True}
 
 @router.get("/auth/verify")
-async def verify_token(auth: HTTPAuthorizationCredentials = Depends(security)):
+async def verify(auth: HTTPAuthorizationCredentials = Depends(security)):
     """Verify token validity"""
-    payload = verify_token(auth.credentials)
+    payload = validate_token(auth.credentials)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
     
