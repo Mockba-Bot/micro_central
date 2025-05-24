@@ -7,6 +7,9 @@ from app.database import get_db
 from sqlalchemy.exc import SQLAlchemyError
 import os
 from redis import asyncio as aioredis
+import hmac
+import hashlib
+import os
 
 from fastapi import FastAPI
 
@@ -26,6 +29,17 @@ async def get_redis():
     return redis_client
 
 router = APIRouter()
+
+def verify_telegram_hash(data: dict, bot_token: str) -> bool:
+    """
+    Validate the hash from Telegram to ensure data is authentic.
+    """
+    data_check = data.copy()
+    hash_str = data_check.pop("hash")
+    secret_key = hashlib.sha256(bot_token.encode()).digest()
+    data_check_str = "\n".join(f"{k}={v}" for k, v in sorted(data_check.items()))
+    computed_hash = hmac.new(secret_key, msg=data_check_str.encode(), digestmod=hashlib.sha256).hexdigest()
+    return computed_hash == hash_str
 
 # Create a new TLogin
 @router.post("/tlogin", response_model=TLoginSchema)
@@ -76,30 +90,6 @@ async def read_login(token: int, db: AsyncSession = Depends(get_db)):
     return login
 
 
-# Retrieve a TLogin by wallet address
-@router.get("/tlogin/by_wallet/{wallet_address}", response_model=TLoginSchema)
-async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(get_db)):
-    redis_client = await get_redis()
-    if redis_client:
-        cached_login = await redis_client.get(f"user_data_wallet:{wallet_address}")
-        if cached_login:
-            try:
-                cached_login = cached_login.decode("utf-8")
-                return TLoginSchema.model_validate_json(cached_login)
-            except UnicodeDecodeError:
-                return TLoginSchema.model_validate_json(cached_login)
-
-    result = await db.execute(select(TLogin).where(TLogin.wallet_address == wallet_address))
-    login = result.scalar_one_or_none()
-    if login is None:
-        raise HTTPException(status_code=404, detail="Login not found")
-
-    if redis_client:
-        await redis_client.set(f"user_data_wallet:{wallet_address}", login.json())
-
-    return login
-
-
 # Update a TLogin by token
 @router.put("/tlogin/{token}", response_model=TLoginSchema)
 async def update_tlogin(token: int, tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
@@ -124,4 +114,20 @@ async def update_tlogin(token: int, tlogin: TLoginCreate, db: AsyncSession = Dep
         return existing_tlogin
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+    
+@app.post("/auth/telegram")
+async def handle_telegram_auth(request: Request):
+    data = await request.json()
+    bot_token = os.getenv("API_TOKEN")  # Replace with your bot's token
+    
+    # 1. Verify the hash (critical for security)
+    if not verify_telegram_hash(data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram hash")
+    
+    # 2. Extract Telegram ID
+    telegram_id = data["telegram_id"]
+    
+    # 3. Store in DB or process further (your logic here)
+    return {"status": "success", "telegram_id": telegram_id}    
 
