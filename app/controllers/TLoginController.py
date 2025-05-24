@@ -116,7 +116,7 @@ async def update_tlogin(token: int, tlogin: TLoginCreate, db: AsyncSession = Dep
         raise HTTPException(status_code=400, detail=str(e))
     
     
-@app.post("/auth/telegram")
+@app.post("/telegram")
 async def handle_telegram_auth(request: Request):
     data = await request.json()
     bot_token = os.getenv("API_TOKEN")  # Replace with your bot's token
