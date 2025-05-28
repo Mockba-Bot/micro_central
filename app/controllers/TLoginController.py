@@ -60,6 +60,31 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+# Retrieve a TLogin by wallet address
+@router.get("/tlogin/by_wallet/{wallet_address}", response_model=TLoginSchema)
+async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(get_db)):
+    redis_client = await get_redis()
+    if redis_client:
+        cached_login = await redis_client.get(f"user_data_wallet:{wallet_address}")
+        if cached_login:
+            try:
+                cached_login = cached_login.decode("utf-8")
+                return TLoginSchema.model_validate_json(cached_login)
+            except UnicodeDecodeError:
+                return TLoginSchema.model_validate_json(cached_login)
+
+    result = await db.execute(select(TLogin).where(TLogin.wallet_address == wallet_address))
+    login = result.scalar_one_or_none()
+    if login is None:
+        raise HTTPException(status_code=404, detail="Login not found")
+
+    if redis_client:
+        await redis_client.set(f"user_data_wallet:{wallet_address}", login.json())
+
+    return login
+
+
 # Retrieve a TLogin by token
 @router.get("/tlogin/{token}", response_model=TLoginSchema)
 async def read_login(token: int, db: AsyncSession = Depends(get_db)):
