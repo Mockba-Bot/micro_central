@@ -10,9 +10,11 @@ from redis import asyncio as aioredis
 import hmac
 import hashlib
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
+
+creation_date=datetime.now(timezone.utc)
 
 app = FastAPI()
 redis_client = None
@@ -51,7 +53,7 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
             token=tlogin.token,
             wallet_address=tlogin.wallet_address,
             want_signal=tlogin.want_signal,
-            creation_date=datetime.utcnow(),  # Automatically set to current UTC time
+            creation_date=datetime.now(timezone.utc), 
             language=tlogin.language
         )
         db.add(new_tlogin)
