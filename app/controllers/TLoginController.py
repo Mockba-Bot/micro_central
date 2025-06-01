@@ -53,7 +53,6 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
             token=tlogin.token,
             wallet_address=tlogin.wallet_address,
             want_signal=tlogin.want_signal,
-            creation_date=datetime.now(timezone.utc), 
             language=tlogin.language
         )
         db.add(new_tlogin)

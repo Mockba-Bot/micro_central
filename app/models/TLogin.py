@@ -9,7 +9,7 @@ class TLogin(Base):
     token = Column(BigInteger, nullable=False)
     wallet_address = Column(String, unique=True)  # Make wallet_address unique
     want_signal = Column(Boolean, default=True)
-    creation_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    creation_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     language = Column(String, default='es')
 
     def __repr__(self):
