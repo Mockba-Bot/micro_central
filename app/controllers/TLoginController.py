@@ -10,6 +10,7 @@ from redis import asyncio as aioredis
 import hmac
 import hashlib
 import os
+from datetime import datetime
 
 from fastapi import FastAPI
 
@@ -50,7 +51,7 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
             token=tlogin.token,
             wallet_address=tlogin.wallet_address,
             want_signal=tlogin.want_signal,
-            creation_date=tlogin.creation_date,
+            creation_date=datetime.utcnow(),  # Automatically set to current UTC time
             language=tlogin.language
         )
         db.add(new_tlogin)
@@ -115,30 +116,30 @@ async def read_login(token: int, db: AsyncSession = Depends(get_db)):
     return login
 
 
-# Update a TLogin by token
-@router.put("/tlogin/{token}", response_model=TLoginSchema)
-async def update_tlogin(token: int, tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
-    try:
-        result = await db.execute(select(TLogin).filter(TLogin.token == token))
-        existing_tlogin = result.scalars().first()
-        if not existing_tlogin:
-            raise HTTPException(status_code=404, detail="TLogin not found")
+# # Update a TLogin by token
+# @router.put("/tlogin/{token}", response_model=TLoginSchema)
+# async def update_tlogin(token: int, tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
+#     try:
+#         result = await db.execute(select(TLogin).filter(TLogin.token == token))
+#         existing_tlogin = result.scalars().first()
+#         if not existing_tlogin:
+#             raise HTTPException(status_code=404, detail="TLogin not found")
 
-        # Update fields with encrypted data
-        existing_tlogin.want_signal = tlogin.want_signal
-        existing_tlogin.language = tlogin.language
+#         # Update fields with encrypted data
+#         existing_tlogin.want_signal = tlogin.want_signal
+#         existing_tlogin.language = tlogin.language
 
-        await db.commit()
+#         await db.commit()
 
-        # Remove the Redis cache for the updated user
-        redis_client = await get_redis()
-        if redis_client:
-            await redis_client.delete(f"user_data:{token}")
+#         # Remove the Redis cache for the updated user
+#         redis_client = await get_redis()
+#         if redis_client:
+#             await redis_client.delete(f"user_data:{token}")
 
-        await db.refresh(existing_tlogin)
-        return existing_tlogin
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#         await db.refresh(existing_tlogin)
+#         return existing_tlogin
+#     except SQLAlchemyError as e:
+#         raise HTTPException(status_code=400, detail=str(e))
     
     
 @router.post("/telegram")

@@ -6,8 +6,7 @@ class TLoginBase(BaseModel):
     token: int
     wallet_address: Optional[str]
     want_signal: bool = True
-    creation_date: datetime
-    language: str = 'es'
+    language: str = 'en'
 
 class TLoginCreate(TLoginBase):
     pass
