@@ -9,7 +9,6 @@ import os
 from redis import asyncio as aioredis
 import hmac
 import hashlib
-import os
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
@@ -34,15 +33,13 @@ async def get_redis():
 router = APIRouter()
 
 def verify_telegram_hash(data: dict, bot_token: str) -> bool:
-    """
-    Validate the hash from Telegram to ensure data is authentic.
-    """
-    data_check = data.copy()
-    hash_str = data_check.pop("hash")
+    auth_data = data.copy()
+    hash_to_check = auth_data.pop("hash")
+    data_check_arr = [f"{k}={v}" for k, v in sorted(auth_data.items())]
+    data_check_string = "\n".join(data_check_arr)
     secret_key = hashlib.sha256(bot_token.encode()).digest()
-    data_check_str = "\n".join(f"{k}={v}" for k, v in sorted(data_check.items()))
-    computed_hash = hmac.new(secret_key, msg=data_check_str.encode(), digestmod=hashlib.sha256).hexdigest()
-    return computed_hash == hash_str
+    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    return computed_hash == hash_to_check
 
 # Create a new TLogin
 @router.post("/tlogin", response_model=TLoginSchema)
@@ -156,5 +153,5 @@ async def handle_telegram_auth(request: Request):
     telegram_id = data["telegram_id"]
     
     # 3. Store in DB or process further (your logic here)
-    return {"status": "success", "telegram_id": telegram_id}    
+    return {"status": "success", "telegram_id": telegram_id}
 
