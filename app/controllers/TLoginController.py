@@ -60,7 +60,7 @@ def verify_telegram_hash(data: dict, bot_token: str) -> bool:
     return hmac.compare_digest(computed_hash, hash_str)
 
 # Create a new TLogin
-@router.post("/tlogin", response_model=TLoginSchema)
+# @router.post("/tlogin", response_model=TLoginSchema)
 async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
     try:
         # Encrypt sensitive fields
@@ -79,7 +79,7 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
 
 
 # Retrieve a TLogin by wallet address
-@router.get("/tlogin/by_wallet/{wallet_address}", response_model=TLoginSchema)
+# @router.get("/tlogin/by_wallet/{wallet_address}", response_model=TLoginSchema)
 async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(get_db)):
     redis_client = await get_redis()
     if redis_client:
@@ -103,7 +103,7 @@ async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(g
 
 
 # Retrieve a TLogin by token
-@router.get("/tlogin/{token}", response_model=TLoginSchema)
+# @router.get("/tlogin/{token}", response_model=TLoginSchema)
 async def read_login(token: int, db: AsyncSession = Depends(get_db)):
     # Get Redis client
     redis_client = await get_redis()
@@ -120,7 +120,7 @@ async def read_login(token: int, db: AsyncSession = Depends(get_db)):
                 return TLoginSchema.model_validate_json(cached_login)
 
     # If not in cache, fetch from database
-    result = await db.execute(select(TLogin).where(TLogin.token == token))
+    result = await db.execute(select(TLogin).where(TLogin.token == int(token)))
     login = result.scalar_one_or_none()
     if login is None:
         raise HTTPException(status_code=404, detail="Login not found")

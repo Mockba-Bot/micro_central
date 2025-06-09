@@ -4,22 +4,24 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI
-from app.controllers import (
+from app.routes import (
+    status_router,
     tlogin_router,
-    t_bot_status_router,
     orderly_router,
-    notification_router,
-    auth_router
+    notification_router
 )
 
-app = FastAPI()
+app = FastAPI(
+    title="Crypto Trading API",
+    version="1.0.0",
+    description="API for running cryptocurrency Trading"
+)
 
 # Include the routers
+app.include_router(status_router, prefix="/api/v1/central", tags=["Status"])
 app.include_router(tlogin_router, prefix="/api/v1/central", tags=["TLogin"])
-app.include_router(t_bot_status_router, prefix="/api/v1/central", tags=["TBotStatus"])
-app.include_router(orderly_router, prefix="/api/v1/central", tags=["Orderly"])
 app.include_router(notification_router, prefix="/api/v1/central", tags=["Notification"])
-app.include_router(auth_router, prefix="/api/v1/central", tags=["Auth"])
+app.include_router(orderly_router, prefix="/api/v1/central", tags=["Orderly"])
 
 # run update of tables
 # alembic init alembic solo la primera vez
