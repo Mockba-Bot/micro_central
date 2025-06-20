@@ -103,6 +103,9 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
                 "token": jwt_token,
                 "expires_in": JWT_EXPIRATION,
                 "wallet_address": user.wallet_address,
+                "want_signal": user.want_signal,
+                "language": user.language,
+                "creation_date": user.creation_date.isoformat() if user.creation_date else None,
             },
         }
 

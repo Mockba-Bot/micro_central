@@ -47,7 +47,17 @@ def read_login_by_wallet_task(wallet_address):
     async def _read():
         async with AsyncSessionLocal() as db:
             login = await read_login_by_wallet(wallet_address, db=db)
-            validated = TLoginSchema.model_validate(login)
+            if not login:
+                return None
+            # ✅ Convertir SQLAlchemy a dict
+            login_dict = {
+                "token": login.token,
+                "wallet_address": login.wallet_address,
+                "want_signal": login.want_signal,
+                "creation_date": login.creation_date.isoformat() if login.creation_date else None,
+                "language": login.language,
+            }
+            validated = TLoginSchema.model_validate(login_dict)
             return validated.model_dump()
 
     loop = asyncio.get_event_loop()
@@ -55,6 +65,7 @@ def read_login_by_wallet_task(wallet_address):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(_read())
+
 
 
 @shared_task(queue="central")
