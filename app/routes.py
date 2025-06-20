@@ -59,6 +59,7 @@ async def send_notification(request: NotificationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error sending notification: {str(e)}")
     
+    
 @tlogin_router.post("/tlogin")
 async def create_tlogin_route(request: TLoginCreateRequest, db: AsyncSession = Depends(get_db)):
     """

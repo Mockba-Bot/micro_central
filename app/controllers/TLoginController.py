@@ -97,8 +97,8 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
         user = await create_tlogin_entry(tlogin, db)
 
         payload = {
-            "sub": str(user.token),
-            "wallet": user.wallet_address,
+            "telegram_id": str(user.token),
+            "wallet_address": user.wallet_address,
             "exp": int(time.time()) + JWT_EXPIRATION,
         }
         jwt_token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -121,8 +121,8 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
 # ✅ Reusable response builder (same as in create_tlogin)
 def build_login_response(user: TLogin):
     payload = {
-        "sub": str(user.token),
-        "wallet": user.wallet_address,
+        "telegram_id": str(user.token),
+        "wallet_address": user.wallet_address,
         "exp": int(time.time()) + JWT_EXPIRATION,
     }
     jwt_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
