@@ -1,6 +1,6 @@
+from celery import shared_task
 import logging
 import asyncio
-from celery import shared_task
 from app.utils.send_bot_notification import send_telegram_message
 from app.controllers.TLoginController import (
     create_tlogin,
@@ -12,6 +12,7 @@ from app.schemas.TLoginSchema import TLoginCreate, TLogin as TLoginSchema
 
 logger = logging.getLogger(__name__)
 
+
 @shared_task(queue="central")
 def send_telegram_message_task(token, message):
     return send_telegram_message(token, message)
@@ -19,27 +20,17 @@ def send_telegram_message_task(token, message):
 
 @shared_task(queue="central")
 def create_tlogin_task(tlogin_data):
-    # Convert token to int if needed
     if isinstance(tlogin_data.get('token'), str):
         tlogin_data['token'] = int(tlogin_data['token'])
 
-    # Create validated TLoginCreate object
     tlogin = TLoginCreate(**tlogin_data)
 
     async def _create():
         async with AsyncSessionLocal() as db:
             login = await create_tlogin(tlogin, db=db)
-            await db.commit()
-            # ✅ Convert ORM object to Pydantic and dump
-            validated = TLoginSchema.model_validate(login)
-            return validated.model_dump()
+            return TLoginSchema.model_validate(login).model_dump()
 
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(_create())
+    return run_async(_create)
 
 
 @shared_task(queue="central")
@@ -47,25 +38,9 @@ def read_login_by_wallet_task(wallet_address):
     async def _read():
         async with AsyncSessionLocal() as db:
             login = await read_login_by_wallet(wallet_address, db=db)
-            if not login:
-                return None
-            # ✅ Convertir SQLAlchemy a dict
-            login_dict = {
-                "token": login.token,
-                "wallet_address": login.wallet_address,
-                "want_signal": login.want_signal,
-                "creation_date": login.creation_date.isoformat() if login.creation_date else None,
-                "language": login.language,
-            }
-            validated = TLoginSchema.model_validate(login_dict)
-            return validated.model_dump()
+            return TLoginSchema.model_validate(login).model_dump()
 
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(_read())
-
+    return run_async(_read)
 
 
 @shared_task(queue="central")
@@ -73,11 +48,17 @@ def read_login_task(token):
     async def _read():
         async with AsyncSessionLocal() as db:
             login = await read_login(token, db=db)
-            validated = TLoginSchema.model_validate(login)
-            return validated.model_dump()
+            return TLoginSchema.model_validate(login).model_dump()
 
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
+    return run_async(_read)
+
+
+def run_async(async_func):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError
+    except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    return loop.run_until_complete(_read())
+    return loop.run_until_complete(async_func())
