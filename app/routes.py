@@ -1,15 +1,14 @@
 from multiprocessing.pool import AsyncResult
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from celery.result import AsyncResult
 from app.tasks.celery_app import celery_app
 from typing import Union
 from app.tasks.celery_tasks import (
-    send_telegram_message_task,
-    read_login_task,
+    send_telegram_message_task
 )
-from app.controllers.TLoginController import create_tlogin, read_login_by_wallet
+from app.controllers.TLoginController import create_tlogin, read_login_by_wallet, read_login
 from app.database import get_db
 
 # Define the router
@@ -17,6 +16,7 @@ status_router = APIRouter()
 tlogin_router = APIRouter()
 notification_router = APIRouter()
 orderly_router = APIRouter()
+
 
 @status_router.get("/status/{task_id}")
 async def get_task_status(task_id: str):
@@ -92,20 +92,16 @@ async def read_login_by_wallet_route(wallet_address: str, db: AsyncSession = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading TLogin by wallet: {str(e)}")
     
-@tlogin_router.get("/tlogin/{token}")
-async def read_login(token: str):
+@tlogin_router.get("/tlogin/validate/{token}", include_in_schema=False)
+async def validate_token_route(token: str, db: AsyncSession = Depends(get_db)):
     """
-    Endpoint to read a TLogin entry by token.
-
-    Args:
-        token (str): The token to look up.
-
-    Returns:
-        dict: The TLogin entry if found, otherwise an error message.
+    Fast lightweight endpoint to validate JWT token for NGINX auth_request.
+    It reuses the full logic from `read_login()` but returns only 200/403/404.
     """
     try:
-        # Call the Celery task
-        result = read_login_task.delay(token)
-        return {"success": True, "data": result.get()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading TLogin by token: {str(e)}")
+        await read_login(token, db=db)  # ← reuse your JWT logic
+        return Response(status_code=200)  # ✅ Valid token
+    except HTTPException as e:
+        if e.status_code in (403, 404):
+            raise e  # ❌ Invalid token or not found
+        raise HTTPException(status_code=500, detail="Internal validation error")

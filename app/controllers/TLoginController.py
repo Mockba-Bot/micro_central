@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models import TLogin
@@ -25,7 +26,7 @@ SECRET_KEY = os.getenv("JWT_SECRET")
 JWT_EXPIRATION = 3 * 24 * 60 * 60  # 3 days = 259200 seconds
 
 JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_ALGORITHM = "HS256"
 
 async def startup_event():
     global redis_client
