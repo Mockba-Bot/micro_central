@@ -65,31 +65,34 @@ def verify_telegram_hash(data: dict, bot_token: str) -> bool:
     
     return hmac.compare_digest(computed_hash, hash_str)
 
+
+async def create_tlogin_entry(tlogin: TLoginCreate, db: AsyncSession) -> TLogin:
+    result = await db.execute(
+        select(TLogin).where(TLogin.token == int(tlogin.token))
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        return existing
+
+    user = TLogin(
+        token=tlogin.token,
+        wallet_address=tlogin.wallet_address,
+        want_signal=tlogin.want_signal,
+        language=tlogin.language,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return user
+
 # Create a new TLogin
 # @router.post("/tlogin", response_model=TLoginSchema)
 async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
     try:
-        # Check if user already exists
-        result = await db.execute(
-            select(TLogin).where(TLogin.token == int(tlogin.token))
-        )
-        existing_tlogin = result.scalar_one_or_none()
+        user = await create_tlogin_entry(tlogin, db)
 
-        if existing_tlogin:
-            user = existing_tlogin
-        else:
-            # Create new user
-            user = TLogin(
-                token=tlogin.token,
-                wallet_address=tlogin.wallet_address,
-                want_signal=tlogin.want_signal,
-                language=tlogin.language,
-            )
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-
-        # Generate JWT
         payload = {
             "sub": str(user.token),
             "wallet": user.wallet_address,

@@ -4,6 +4,7 @@ import asyncio
 from app.utils.send_bot_notification import send_telegram_message
 from app.controllers.TLoginController import (
     create_tlogin,
+    create_tlogin_entry,
     read_login_by_wallet,
     read_login
 )
@@ -27,8 +28,8 @@ def create_tlogin_task(tlogin_data):
 
     async def _create():
         async with AsyncSessionLocal() as db:
-            login = await create_tlogin(tlogin, db=db)
-            return TLoginSchema.model_validate(login).model_dump()
+            user = await create_tlogin_entry(tlogin, db=db)
+            return TLoginSchema.model_validate(user).model_dump()
 
     return run_async(_create)
 
