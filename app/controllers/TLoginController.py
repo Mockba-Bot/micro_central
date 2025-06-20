@@ -11,6 +11,8 @@ import hmac
 import hashlib
 import os
 from datetime import datetime, timezone
+import time
+import jwt
 
 from fastapi import FastAPI
 
@@ -18,6 +20,10 @@ creation_date=datetime.now(timezone.utc)
 
 app = FastAPI()
 redis_client = None
+
+SECRET_KEY = os.getenv("JWT_SECRET")
+JWT_EXPIRATION = 3 * 24 * 60 * 60  # 3 days = 259200 seconds
+
 
 async def startup_event():
     global redis_client
@@ -63,17 +69,43 @@ def verify_telegram_hash(data: dict, bot_token: str) -> bool:
 # @router.post("/tlogin", response_model=TLoginSchema)
 async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)):
     try:
-        # Encrypt sensitive fields
-        new_tlogin = TLogin(
-            token=tlogin.token,
-            wallet_address=tlogin.wallet_address,
-            want_signal=tlogin.want_signal,
-            language=tlogin.language
+        # Check if user already exists
+        result = await db.execute(
+            select(TLogin).where(TLogin.token == int(tlogin.token))
         )
-        db.add(new_tlogin)
-        await db.commit()
-        await db.refresh(new_tlogin)
-        return new_tlogin
+        existing_tlogin = result.scalar_one_or_none()
+
+        if existing_tlogin:
+            user = existing_tlogin
+        else:
+            # Create new user
+            user = TLogin(
+                token=tlogin.token,
+                wallet_address=tlogin.wallet_address,
+                want_signal=tlogin.want_signal,
+                language=tlogin.language,
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+
+        # Generate JWT
+        payload = {
+            "sub": str(user.token),
+            "wallet": user.wallet_address,
+            "exp": int(time.time()) + JWT_EXPIRATION,
+        }
+        jwt_token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+        return {
+            "status": "ok",
+            "data": {
+                "token": jwt_token,
+                "expires_in": JWT_EXPIRATION,
+                "wallet_address": user.wallet_address,
+            },
+        }
+
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
