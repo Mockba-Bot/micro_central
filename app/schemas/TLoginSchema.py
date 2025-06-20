@@ -15,7 +15,7 @@ class TLogin(TLoginBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # ✅ Pydantic v2 replacement for orm_mode
 
 class LoginRequest(BaseModel):
     """Request model for MetaMask login"""
