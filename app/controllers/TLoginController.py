@@ -104,7 +104,7 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
             "status": "ok",
             "data": {
                 "token": jwt_token,
-                "expires_in": JWT_EXPIRATION,
+                "expires_at": JWT_EXPIRATION,
                 "wallet_address": user.wallet_address,
                 "want_signal": user.want_signal,
                 "language": user.language,

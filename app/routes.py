@@ -1,15 +1,17 @@
 from multiprocessing.pool import AsyncResult
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from celery.result import AsyncResult
 from app.tasks.celery_app import celery_app
 from typing import Union
 from app.tasks.celery_tasks import (
     send_telegram_message_task,
-    create_tlogin_task,
     read_login_by_wallet_task,
     read_login_task,
 )
+from app.controllers.TLoginController import create_tlogin
+from app.database import get_db
 
 # Define the router
 status_router = APIRouter()
@@ -59,22 +61,20 @@ async def send_notification(request: NotificationRequest):
         raise HTTPException(status_code=500, detail=f"Error sending notification: {str(e)}")
     
 @tlogin_router.post("/tlogin")
-async def create_tlogin(request: TLoginCreateRequest):
+async def create_tlogin_route(request: TLoginCreateRequest, db: AsyncSession = Depends(get_db)):
     """
-    Endpoint to create a TLogin entry.
+    Endpoint to create a TLogin entry and return a signed JWT token.
 
     Args:
-        tlogin (TLoginCreate): Contains the token, wallet address, and signal preference.
+        request (TLoginCreateRequest): Contains the token, wallet address, and signal preference.
 
     Returns:
-        dict: Status message indicating success or failure.
+        dict: JWT token, expiration info, and user preferences.
     """
     try:
-        # Call the Celery task
-        task = create_tlogin_task.delay(request.model_dump())
-        return {"task_id": task.id}
+        return await create_tlogin(request, db)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating TLogin: {str(e)}")    
+        raise HTTPException(status_code=500, detail=f"Error creating TLogin: {str(e)}")  
 
 
 @tlogin_router.get("/tlogin/by_wallet/{wallet_address}")
