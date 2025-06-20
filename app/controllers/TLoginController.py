@@ -174,7 +174,7 @@ async def read_login(token: str, db: AsyncSession = Depends(get_db)):
     # Step 1 – Decode JWT
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        telegram_id = payload.get("telegram_id")
+        telegram_id = int(payload.get("telegram_id"))
         wallet_address = payload.get("wallet_address")
         if telegram_id is None or wallet_address is None:
             raise HTTPException(status_code=403, detail="Invalid JWT structure")
