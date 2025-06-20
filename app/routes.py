@@ -7,10 +7,9 @@ from app.tasks.celery_app import celery_app
 from typing import Union
 from app.tasks.celery_tasks import (
     send_telegram_message_task,
-    read_login_by_wallet_task,
     read_login_task,
 )
-from app.controllers.TLoginController import create_tlogin
+from app.controllers.TLoginController import create_tlogin, read_login_by_wallet
 from app.database import get_db
 
 # Define the router
@@ -78,7 +77,7 @@ async def create_tlogin_route(request: TLoginCreateRequest, db: AsyncSession = D
 
 
 @tlogin_router.get("/tlogin/by_wallet/{wallet_address}")
-async def read_login_by_wallet(wallet_address: str):
+async def read_login_by_wallet_route(wallet_address: str, db: AsyncSession = Depends(get_db)):
     """
     Endpoint to read a TLogin entry by wallet address.
 
@@ -86,12 +85,10 @@ async def read_login_by_wallet(wallet_address: str):
         wallet_address (str): The wallet address to look up.
 
     Returns:
-        dict: The TLogin entry if found, otherwise an error message.
+        dict: The TLogin entry with JWT if found.
     """
     try:
-        # Call the Celery task
-        result = read_login_by_wallet_task.delay(wallet_address)
-        return {"success": True, "data": result.get()}
+        return await read_login_by_wallet(wallet_address, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading TLogin by wallet: {str(e)}")
     

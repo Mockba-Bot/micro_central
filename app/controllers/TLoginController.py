@@ -24,6 +24,8 @@ redis_client = None
 SECRET_KEY = os.getenv("JWT_SECRET")
 JWT_EXPIRATION = 3 * 24 * 60 * 60  # 3 days = 259200 seconds
 
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 async def startup_event():
     global redis_client
@@ -115,32 +117,55 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# ✅ Reusable response builder (same as in create_tlogin)
+def build_login_response(user: TLogin):
+    payload = {
+        "sub": str(user.token),
+        "wallet": user.wallet_address,
+        "exp": int(time.time()) + JWT_EXPIRATION,
+    }
+    jwt_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    return {
+        "status": "ok",
+        "data": {
+            "token": jwt_token,
+            "expires_at": JWT_EXPIRATION,
+            "wallet_address": user.wallet_address,
+            "want_signal": user.want_signal,
+            "language": user.language,
+            "creation_date": user.creation_date.isoformat() if user.creation_date else None,
+        },
+    }
 
 # Retrieve a TLogin by wallet address
 # @router.get("/tlogin/by_wallet/{wallet_address}", response_model=TLoginSchema)
 async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(get_db)):
     redis_client = await get_redis()
+
+    # Try Redis cache
     if redis_client:
         cached_login = await redis_client.get(f"user_data_wallet:{wallet_address}")
         if cached_login:
             try:
-                cached_login = cached_login.decode("utf-8")
-                return TLoginSchema.model_validate_json(cached_login)
-            except UnicodeDecodeError:
-                return TLoginSchema.model_validate_json(cached_login)
+                user = TLogin.model_validate_json(cached_login)
+            except Exception:
+                user = None
+            else:
+                return build_login_response(user)
 
+    # Fetch from DB
     result = await db.execute(select(TLogin).where(TLogin.wallet_address == wallet_address))
-    login = result.scalar_one_or_none()
-    if login is None:
+    user = result.scalar_one_or_none()
+    if user is None:
         raise HTTPException(status_code=404, detail="Login not found")
 
+    # Cache in Redis
     if redis_client:
-        await redis_client.set(f"user_data_wallet:{wallet_address}", login.json())
+        await redis_client.set(f"user_data_wallet:{wallet_address}", user.json(), ex=JWT_EXPIRATION)
 
-    return login
+    return build_login_response(user)
 
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # Retrieve a TLogin by token
 # @router.get("/tlogin/{token}", response_model=TLoginSchema)
