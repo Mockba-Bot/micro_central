@@ -133,33 +133,47 @@ async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(g
 
     return login
 
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # Retrieve a TLogin by token
 # @router.get("/tlogin/{token}", response_model=TLoginSchema)
-async def read_login(token: int, db: AsyncSession = Depends(get_db)):
-    # Get Redis client
+async def read_login(token: str, db: AsyncSession = Depends(get_db)):
+    # Step 1 – Decode JWT
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        telegram_id = payload.get("telegram_id")
+        wallet_address = payload.get("wallet_address")
+        if telegram_id is None or wallet_address is None:
+            raise HTTPException(status_code=403, detail="Invalid JWT structure")
+    except JWTError as e:
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
+
+    # Step 2 – Redis Cache Check
     redis_client = await get_redis()
     if redis_client:
-        # Check Redis cache first
-        cached_login = await redis_client.get(f"user_data:{token}")
-        if cached_login:
+        cache_key = f"user_data:{token}"
+        cached = await redis_client.get(cache_key)
+        if cached:
             try:
-                # Try to decode as UTF-8 first
-                cached_login = cached_login.decode("utf-8")
-                return TLoginSchema.model_validate_json(cached_login)
-            except UnicodeDecodeError:
-                # If UTF-8 fails, try to parse directly from bytes
-                return TLoginSchema.model_validate_json(cached_login)
+                return TLoginSchema.model_validate_json(cached.decode("utf-8"))
+            except Exception:
+                pass  # fallback to DB
 
-    # If not in cache, fetch from database
-    result = await db.execute(select(TLogin).where(TLogin.token == int(token)))
+    # Step 3 – Fetch from DB
+    result = await db.execute(
+        select(TLogin).where(
+            TLogin.token == telegram_id,
+            TLogin.wallet_address == wallet_address
+        )
+    )
     login = result.scalar_one_or_none()
-    if login is None:
+    if not login:
         raise HTTPException(status_code=404, detail="Login not found")
 
-    # Cache the result in Redis if available
+    # Step 4 – Cache the result
     if redis_client:
-        await redis_client.set(f"user_data:{token}", login.json())
+        await redis_client.set(f"user_data:{token}", login.json(), ex=60 * 60 * 3)  # 3 hours
 
     return login
 
