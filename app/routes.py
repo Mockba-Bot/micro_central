@@ -5,16 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from celery.result import AsyncResult
 from app.tasks.celery_app import celery_app
 from typing import Union
-from app.tasks.celery_tasks import (
-    send_telegram_message_task
-)
 from app.controllers.TLoginController import create_tlogin, read_login_by_wallet, read_login
 from app.database import get_db
 
 # Define the router
 status_router = APIRouter()
 tlogin_router = APIRouter()
-notification_router = APIRouter()
 orderly_router = APIRouter()
 
 
@@ -30,11 +26,6 @@ async def get_task_status(task_id: str):
     else:
         return {"status": task_result.state}
 
-# Define the request body model
-class NotificationRequest(BaseModel):
-    token: int
-    message: str
-
 
 class TLoginCreateRequest(BaseModel):
     token: Union[str, int]
@@ -42,23 +33,6 @@ class TLoginCreateRequest(BaseModel):
     want_signal: bool
     language: str = "en"
 
-@notification_router.post("/send_notification")
-async def send_notification(request: NotificationRequest):
-    """
-    Endpoint to send a trade notification via Telegram.
-
-    Args:
-        request (NotificationRequest): Contains the token (chat ID) and message.
-
-    Returns:
-        dict: Status message indicating success or failure.
-    """
-    try:
-        # Call the Celery task
-        send_telegram_message_task.delay(request.token, request.message)
-        return {"success": True, "message": "Notification sent"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error sending notification: {str(e)}")
     
     
 @tlogin_router.post("/tlogin")

@@ -1,7 +1,6 @@
 from celery import shared_task
 import logging
 import asyncio
-from app.utils.send_bot_notification import send_telegram_message
 from app.controllers.TLoginController import (
     create_tlogin,
     create_tlogin_entry,
@@ -12,11 +11,6 @@ from app.database import AsyncSessionLocal
 from app.schemas.TLoginSchema import TLoginCreate, TLogin as TLoginSchema
 
 logger = logging.getLogger(__name__)
-
-
-@shared_task(queue="central")
-def send_telegram_message_task(token, message):
-    return send_telegram_message(token, message)
 
 
 @shared_task(queue="central")
