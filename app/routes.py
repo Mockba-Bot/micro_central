@@ -82,17 +82,15 @@ async def create_tlogin_route(request: TLoginCreateRequest, db: AsyncSession = D
 async def read_login_by_wallet_route(wallet_address: str, db: AsyncSession = Depends(get_db)):
     """
     Endpoint to read a TLogin entry by wallet address.
-
-    Args:
-        wallet_address (str): The wallet address to look up.
-
-    Returns:
-        dict: The TLogin entry with JWT if found.
     """
     try:
         return await read_login_by_wallet(wallet_address, db)
+    except HTTPException as e:
+        raise e  # ✅ re-raise cleanly without turning into 500
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading TLogin by wallet: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
     
 @tlogin_router.get("/tlogin/validate/{token}", include_in_schema=False)
 async def validate_token_route(token: str, db: AsyncSession = Depends(get_db)):
