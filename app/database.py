@@ -11,7 +11,11 @@ import ssl
 load_dotenv(dotenv_path=".env.micro.central")
 
 # Fetch the database URL from the environment variable
-DATABASE_URL = os.getenv("DATABASE_URL").replace("postgresql://", "postgresql+asyncpg://")
+# Remove sslmode parameter from URL if present
+db_url = os.getenv("DATABASE_URL")
+if "sslmode=" in db_url:
+    db_url = db_url.split("?")[0]
+DATABASE_URL = db_url.replace("postgresql://", "postgresql+asyncpg://")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set in the environment or .env file.")
@@ -20,6 +24,8 @@ if not DATABASE_URL:
 # engine = create_async_engine(DATABASE_URL, echo=True)
 # SSL context for DigitalOcean PostgreSQL
 ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
 # Async SQLAlchemy engine with SSL
 engine = create_async_engine(

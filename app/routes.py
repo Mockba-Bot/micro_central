@@ -40,6 +40,7 @@ class TLoginCreateRequest(BaseModel):
     token: Union[str, int]
     wallet_address: str
     want_signal: bool
+    language: str = "en"
 
 @notification_router.post("/send_notification")
 async def send_notification(request: NotificationRequest):
