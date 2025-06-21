@@ -4,6 +4,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from databases import Database
 from dotenv import load_dotenv
+import ssl
 
 # Load environment variables from the .env file
 # Load environment variables from the specified .env file
@@ -16,7 +17,16 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set in the environment or .env file.")
 
 # Async SQLAlchemy engine
-engine = create_async_engine(DATABASE_URL, echo=True)
+# engine = create_async_engine(DATABASE_URL, echo=True)
+# SSL context for DigitalOcean PostgreSQL
+ssl_context = ssl.create_default_context()
+
+# Async SQLAlchemy engine with SSL
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,
+    connect_args={"ssl": ssl_context}
+)
 
 # Async session local
 AsyncSessionLocal = sessionmaker(
