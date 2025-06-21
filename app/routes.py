@@ -93,7 +93,7 @@ async def read_login_by_wallet_route(wallet_address: str, db: AsyncSession = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading TLogin by wallet: {str(e)}")
     
-@tlogin_router.get("/tlogin/validate/{token}/", include_in_schema=False)
+@tlogin_router.get("/tlogin/validate/{token}", include_in_schema=False)
 async def validate_token_route(token: str, db: AsyncSession = Depends(get_db)):
     """
     Fast lightweight endpoint to validate JWT token for NGINX auth_request.
