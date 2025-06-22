@@ -134,6 +134,7 @@ def build_login_response(user: TLogin):
             "expires_at": JWT_EXPIRATION,
             "wallet_address": user.wallet_address,
             "want_signal": user.want_signal,
+            "telegram_id": user.token,
             "language": user.language,
             "creation_date": user.creation_date.isoformat() if user.creation_date else None,
         },
