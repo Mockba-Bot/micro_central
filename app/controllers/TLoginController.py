@@ -154,7 +154,7 @@ async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(g
             except Exception:
                 user = None
             else:
-                return build_login_response(user)
+                return await build_login_response(user)
 
     # Fetch from DB
     result = await db.execute(select(TLogin).where(TLogin.wallet_address == wallet_address))
@@ -166,7 +166,7 @@ async def read_login_by_wallet(wallet_address: str, db: AsyncSession = Depends(g
     if redis_client:
         await redis_client.set(f"user_data_wallet:{wallet_address}", user.json(), ex=JWT_EXPIRATION)
 
-    return build_login_response(user)
+    return await build_login_response(user)
 
 
 # Retrieve a TLogin by token
