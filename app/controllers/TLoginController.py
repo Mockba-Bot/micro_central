@@ -42,7 +42,7 @@ async def get_redis():
 
 router = APIRouter()
 
-def verify_telegram_hash(data: dict, bot_token: str) -> bool:
+async def verify_telegram_hash(data: dict, bot_token: str) -> bool:
     """
     Validate the hash from Telegram to ensure data is authentic.
     """
@@ -119,7 +119,7 @@ async def create_tlogin(tlogin: TLoginCreate, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=400, detail=str(e))
 
 # ✅ Reusable response builder (same as in create_tlogin)
-def build_login_response(user: TLogin):
+async def build_login_response(user: TLogin):
     payload = {
         "telegram_id": str(user.token),
         "wallet_address": user.wallet_address,

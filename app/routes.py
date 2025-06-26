@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from celery.result import AsyncResult
-from app.tasks.celery_app import celery_app
 from typing import Union
 from app.controllers.TLoginController import create_tlogin, read_login_by_wallet, read_login
 from app.database import get_db
@@ -12,19 +11,6 @@ from app.database import get_db
 status_router = APIRouter()
 tlogin_router = APIRouter()
 orderly_router = APIRouter()
-
-
-@status_router.get("/status/{task_id}")
-async def get_task_status(task_id: str):
-    task_result = AsyncResult(task_id, app=celery_app)
-    if task_result.state == 'PENDING':
-        return {"status": "Pending"}
-    elif task_result.state == 'SUCCESS':
-        return {"status": "Success", "result": task_result.result}
-    elif task_result.state == 'FAILURE':
-        return {"status": "Failure", "result": str(task_result.result)}
-    else:
-        return {"status": task_result.state}
 
 
 class TLoginCreateRequest(BaseModel):
