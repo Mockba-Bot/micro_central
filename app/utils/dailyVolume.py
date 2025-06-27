@@ -12,12 +12,19 @@ from dotenv import load_dotenv
 import datetime
 from collections import defaultdict
 from sqlalchemy.dialects.postgresql import insert
-from app.database import get_db, ORDERLY_ACCOUNT_ID, ORDERLY_SECRET, ORDERLY_PUBLIC_KEY, BASE_URL
+from app.database import get_db
 from app.models.TVolumeRecord import TVolumeRecord
 
 # Add project root to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
+# Load environment variables
+load_dotenv(dotenv_path=".env.micro.central")
+
+ORDERLY_ACCOUNT_ID = os.getenv("ORDERLY_ACCOUNT_ID")
+ORDERLY_SECRET = os.getenv("ORDERLY_SECRET", "").replace("ed25519:", "")
+ORDERLY_PUBLIC_KEY = os.getenv("ORDERLY_PUBLIC_KEY")
+BASE_URL = os.getenv("ORDERLY_BASE_URL")
 
 # Decode Base58 secret key
 private_key = Ed25519PrivateKey.from_private_bytes(b58decode(ORDERLY_SECRET))
