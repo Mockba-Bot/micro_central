@@ -9,6 +9,11 @@ import ssl
 # Load environment variables from the specified .env file
 load_dotenv(dotenv_path=".env.micro.central")
 
+ORDERLY_ACCOUNT_ID = os.getenv("ORDERLY_ACCOUNT_ID")
+ORDERLY_SECRET = os.getenv("ORDERLY_SECRET", "").replace("ed25519:", "")
+ORDERLY_PUBLIC_KEY = os.getenv("ORDERLY_PUBLIC_KEY")
+BASE_URL = os.getenv("ORDERLY_BASE_URL")
+
 # Fetch the database URL from the environment variable
 # Remove sslmode parameter from URL if present
 db_url = os.getenv("DATABASE_URL")
