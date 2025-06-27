@@ -19,7 +19,7 @@ from app.models.TVolumeRecord import TVolumeRecord
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path=".env.micro.central")
 
 ORDERLY_ACCOUNT_ID = os.getenv("ORDERLY_ACCOUNT_ID")
 ORDERLY_SECRET = os.getenv("ORDERLY_SECRET", "").replace("ed25519:", "")
