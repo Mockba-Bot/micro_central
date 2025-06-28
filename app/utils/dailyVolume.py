@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO)
 async def fetch_broker_daily_volume_orderly():
     timestamp = str(int(time.time() * 1000))
     today = datetime.date.today()
-    thirty_days_ago = today - datetime.timedelta(days=30)
+    thirty_days_ago = today - datetime.timedelta(days=2)
     params = {
         "start_date": thirty_days_ago.strftime("%Y-%m-%d"),
         "end_date": today.strftime("%Y-%m-%d")
