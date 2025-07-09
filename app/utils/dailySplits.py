@@ -37,15 +37,11 @@ logging.basicConfig(level=logging.INFO)
 async def fetch_broker_daily_volume_orderly():
     timestamp = str(int(time.time() * 1000))
     today = datetime.date.today()
-    days_ago = today - datetime.timedelta(days=10)
+    thirty_days_ago = today - datetime.timedelta(days=2)
     params = {
-        "start_date": days_ago.strftime("%Y-%m-%d"),
+        "start_date": thirty_days_ago.strftime("%Y-%m-%d"),
         "end_date": today.strftime("%Y-%m-%d")
     }
-    # params = {
-    #     "start_date": "2025-07-01",
-    #     "end_date": "2025-07-30"
-    # }
 
     path = "/v1/volume/broker/daily"
     query = f"?{urllib.parse.urlencode(params)}"
@@ -84,7 +80,7 @@ async def fetch_broker_daily_volume_orderly():
             "address": "",
             "broker_id": ""
         })
-        print(f"Processing {len(rows)} rows from Orderly API")
+
         for row in rows:
             record_date = datetime.datetime.strptime(row["date"], "%Y-%m-%d").date()
             key = (record_date, ORDERLY_ACCOUNT_ID)
@@ -110,8 +106,6 @@ async def fetch_broker_daily_volume_orderly():
                 "address": values["address"],
                 "broker_id": values["broker_id"],
                 "realized_pnl": values["realized_pnl"],
-                "distributed": False,
-                "distributed_fees_half": 0
             })
 
         # Step 2: Async upsert

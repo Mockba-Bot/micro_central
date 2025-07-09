@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Numeric, Date
+from sqlalchemy import Column, String, Numeric, Date, Boolean
 from app.database import Base
 
 class TVolumeRecord(Base):
@@ -14,3 +14,5 @@ class TVolumeRecord(Base):
     address = Column(String(42))
     broker_id = Column(String(50))
     realized_pnl = Column(Numeric(20, 8))
+    distributed = Column(Boolean, default=False)
+    distributed_fees_half = Column(Numeric(20, 8), default=0)
