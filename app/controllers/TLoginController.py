@@ -23,8 +23,7 @@ app = FastAPI()
 redis_client = None
 
 SECRET_KEY = os.getenv("JWT_SECRET")
-JWT_EXPIRATION = 1 * 24 * 60 * 60  # 1 day = 86400 seconds
-
+JWT_EXPIRATION = 3 * 24 * 60 * 60  # 3 days
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 
